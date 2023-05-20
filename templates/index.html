@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+	<meta charset="UTF-8">
+	<title>Clay Time Tracker</title>
+	
+	<!-- bulma.css -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma@0.9.4/css/bulma.min.css">
+
+    <!-- Load Axios -->
+    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+
+    <!-- Load Vue.js-->
+    <script src="https://unpkg.com/vue@next"></script>
+	
+</head>
+<body>
+	<div>
+		<section class="is-full section">
+			
+			<!-- 근무 시간 입력을 위한 폼 -->
+			<form action="/worktime_process" method="post">
+			
+			<!-- 이름 표시 -->
+			{{ user.displayname }}
+				<div class="field">
+					<label class="label">유저아이디</label>
+					<div class="control">
+						<input class="input" type="number" name="user_id" placeholder="시간을 입력하세요."
+						value="{{user.id}}">
+					</div>
+				</div>
+				<div class="field">
+					<label class="label">기록하는 날</label>
+					<div class="control">
+						<input class="input" type="date" name="dayworktime_date" placeholder="시간을 입력하세요."
+						value="{{ date.strftime('%Y-%m-%d') }}">
+					</div>
+				</div>
+				<div class="field">
+					<label class="label">근무 시작 시간</label>
+					<div class="control">
+						<input class="input" type="time" name="start_time" placeholder="시간을 입력하세요.">
+					</div>
+				</div>
+				<div class="field">
+					<label class="label">근무 종료 시간</label>
+					<div class="control">
+						<input class="input" type="time" name="end_time" placeholder="시간을 입력하세요.">
+					</div>
+				</div>
+				<div class="field">
+					<label class="label">휴게 시간</label>
+					<div class="control">
+						<input class="input" type="time" name="break_time" placeholder="시간을 입력하세요.">
+					</div>
+				</div>
+				<div class="field">
+					<div class="control">
+						<button class="button is-link" type="submit">입력</button>
+					</div>
+				</div>
+			
+			</form>
+			
+			
+			<!-- 근무 시작 시간 입력 받음 -->
+			
+			<!-- 근무 종료 시간 입력 받음 -->
+			
+			<!-- 휴게 시간 입력 받음 -->
+			
+			<!-- 입력 버튼 -->
+			
+			
+			
+			
+			
+		</section>
+	</div>
+</body>
+</html>

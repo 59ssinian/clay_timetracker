@@ -1,7 +1,7 @@
 from tortoise import fields, models
 
 #유저 아이디 비밀번호
-class Users(models.Model):
+class User(models.Model):
     id = fields.IntField(pk=True)
     username = fields.CharField(max_length=30, unique=True)
     displayname = fields.CharField(max_length=30, null=True)
@@ -10,9 +10,9 @@ class Users(models.Model):
     modified_at = fields.DatetimeField(auto_now=True)
 
 #일일 작업 시작 시간, 종료시간, 휴식시간, 총 작업시간, 휴일여부
-class DayWorkTimes(models.Model):
+class DayWorkTime(models.Model):
     id = fields.IntField(pk=True)
-    user = fields.ForeignKeyField("models.Users", related_name="worktime")
+    user = fields.ForeignKeyField("models.User", related_name="worktime")
     dayworktime_date = fields.DateField()
     dayworktime_start = fields.DatetimeField()
     dayworktime_end = fields.DatetimeField()
@@ -23,9 +23,9 @@ class DayWorkTimes(models.Model):
     modified_at = fields.DatetimeField(auto_now=True)
 
 #년도, 월, 기준시작일, 기준 종료일, 주당작업시간, 지정근무시간, 초과여부(True/False)
-class WeekWorkTimes(models.Model):
+class WeekWorkTime(models.Model):
     id = fields.IntField(pk=True)
-    user = fields.ForeignKeyField("models.Users", related_name="weekworktime")
+    user = fields.ForeignKeyField("models.User", related_name="weekworktime")
     year = fields.IntField()
     month = fields.IntField()
     weekworktime_start = fields.DateField()
@@ -39,12 +39,10 @@ class WeekWorkTimes(models.Model):
 #휴일등록여부
 class Holidays(models.Model):
     id = fields.IntField(pk=True)
-    user = fields.ForeignKeyField("models.Users", related_name="holiday")
+    user = fields.ForeignKeyField("models.User", related_name="holiday")
     holiday_date = fields.DateField()
     created_at = fields.DatetimeField(auto_now_add=True)
     modified_at = fields.DatetimeField(auto_now=True)
-
-
 
 
 
