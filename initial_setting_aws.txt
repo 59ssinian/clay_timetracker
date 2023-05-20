@@ -1,0 +1,10 @@
+# postgresql install & change password #
+
+sudo apt update
+sudo apt upgrade
+sudo apt install postgresql postgresql-contrib
+sudo -u postgres psql
+\password postgres
+# password : claytimetracker
+\q
+
