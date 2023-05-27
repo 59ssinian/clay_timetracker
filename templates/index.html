@@ -23,7 +23,7 @@
 			
 			<!-- 이름 표시 -->
 			{{ user.displayname }}
-				<div class="field">
+				<div class="field" style="display:none;">
 					<label class="label">유저아이디</label>
 					<div class="control">
 						<input class="input" type="number" name="user_id" placeholder="시간을 입력하세요."
@@ -40,19 +40,19 @@
 				<div class="field">
 					<label class="label">근무 시작 시간</label>
 					<div class="control">
-						<input class="input" type="time" name="start_time" placeholder="시간을 입력하세요.">
+						<input class="input" type="time" name="dayworktime_start" placeholder="시간을 입력하세요.">
 					</div>
 				</div>
 				<div class="field">
 					<label class="label">근무 종료 시간</label>
 					<div class="control">
-						<input class="input" type="time" name="end_time" placeholder="시간을 입력하세요.">
+						<input class="input" type="time" name="dayworktime_end" placeholder="시간을 입력하세요.">
 					</div>
 				</div>
 				<div class="field">
 					<label class="label">휴게 시간</label>
 					<div class="control">
-						<input class="input" type="time" name="break_time" placeholder="시간을 입력하세요.">
+						<input class="input" type="time" name="dayworktime_rest" placeholder="시간을 입력하세요.">
 					</div>
 				</div>
 				<div class="field">

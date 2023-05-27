@@ -1,13 +1,14 @@
+
 from fastapi import FastAPI, Request, Form
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
-from model import User #User 모델 import
+from src.model import User, DayWorkTime #User, DayWorkTime 모델 import
 
 from tortoise import Tortoise
 
-from datetime import date
+from datetime import date, time, timedelta
 
-
+import src.timemanage
 
 app = FastAPI()
 templates = Jinja2Templates(directory="templates")
@@ -56,12 +57,48 @@ async def login(request: Request, username: str = Form(),
         context = {"request": request, "user": user, "date":input_date}
         return templates.TemplateResponse("index.html", context)
     else:
-        return templates.TemplateResponse("login.html", {"request": request})
+        return templates.TemplateResponse("login.html", {"request": request, "message" : "아이디나 비빌번호가 맞지 않습니다"})
+
+
+# 시간정보를 입력 받고, 주당 근무시한을 계산하여 입력하고, 이를 출력해서 보여줌
+@app.post("/index_process")
+async def index(request: Request, user_id: int = Form(),
+                dayworktime_date: date = Form(),
+                dayworktime_start: time = Form(),
+                dayworktime_end: time = Form(),
+                dayworktime_rest: timedelta = Form()):
+    
+    #user_id로 user 정보를 가져옴
+    user = await User.filter(id=user_id).first()
+    
+    #dayworktime의 처리
+    dayworktime = DayWorkTime()
+    dayworktime.user_id = user_id
+    dayworktime.dayworktime_date = dayworktime_date
+    dayworktime.dayworktime_start = dayworktime_start
+    dayworktime.dayworktime_end = dayworktime_end
+    dayworktime.dayworktime_rest = dayworktime_rest
+    dayworktime.dayworktime_total = dayworktime_end - dayworktime_start - dayworktime_rest
+    dayworktime.dayworktime_holiday = False
+    
+    
+    result = src.insert_time(user, dayworktime)
+    
+    
+    
+    
+    
+    #주당 근무시간 업데이트
+    
+    #주당 근무시간 계산
+    #주당 근무시간 업데이트
+    
+    #주당 근무시간 출력
     
 
-
-
-
+    
+    
+    
 
 
 async def init_db():
@@ -69,4 +106,5 @@ async def init_db():
             db_url='postgres://postgres:claytimetracker@localhost:5432/timetracker',
             modules={'models': ['model']},
         )
+    
     await Tortoise.generate_schemas()
