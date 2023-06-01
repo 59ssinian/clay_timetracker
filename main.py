@@ -2,16 +2,33 @@
 from fastapi import FastAPI, Request, Form
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
-from src.model import User, DayWorkTime #User, DayWorkTime 모델 import
+from fastapi.middleware.cors import CORSMiddleware
 
+from src.model import User, DayWorkTime, WeekWorkTime, Holidays, WorkTimeStandard
 from tortoise import Tortoise
 
-from datetime import date, time, timedelta
+from datetime import datetime, date, time, timedelta
+from pydantic import BaseModel
 
-import src.timemanage
+import src.timemanage as timemanage
 
 app = FastAPI()
 templates = Jinja2Templates(directory="templates")
+
+# for front-end
+origins = [
+    "http://localhost",
+    "http://localhost:8080",
+    "http://3.34.198.181:8000"
+]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 @app.on_event("startup")
 async def startup():
@@ -20,6 +37,8 @@ async def startup():
 @app.on_event("shutdown")
 async def shutdown():
     await Tortoise.close_connections()
+
+
 
 @app.get("/", response_class=HTMLResponse)
 async def root(request: Request):
@@ -42,6 +61,7 @@ async def signup(request: Request, username: str = Form(),
     user = await User.create(username=username, password=password, displayname=displayname)
     return templates.TemplateResponse("login.html", {"request": request})
 
+
 #로그인 정보 입력 시에 로그인 확인
 @app.post("/login_process")
 async def login(request: Request, username: str = Form(),
@@ -51,60 +71,79 @@ async def login(request: Request, username: str = Form(),
     if user:
         
         #마지막 기재되지 않는 날짜가 있으면 그 날짜에서 시작
-        
-        #없으면 오늘 날짜에서 시작
+        #input_date = timemanage.get_input_day(user.id)
         input_date = date.today()
-        context = {"request": request, "user": user, "date":input_date}
+        weekworktimenow = await timemanage.weekly_worktime_now(user.id, input_date)
+        context = {"request": request, "user": user, "date":input_date, "weekworktimenow":weekworktimenow}
         return templates.TemplateResponse("index.html", context)
     else:
-        return templates.TemplateResponse("login.html", {"request": request, "message" : "아이디나 비빌번호가 맞지 않습니다"})
+        return templates.TemplateResponse("login.html", {"request": request, "message" : "아이디나 비밀번호가 맞지 않습니다"})
 
+
+class DataRequest(BaseModel):
+    user_id: int
+    dayworktime_date: date
+    dayworktime_start: time
+    dayworktime_end: time
+    dayworktime_rest: timedelta
+    dayworktime_holiday: bool
 
 # 시간정보를 입력 받고, 주당 근무시한을 계산하여 입력하고, 이를 출력해서 보여줌
-@app.post("/index_process")
-async def index(request: Request, user_id: int = Form(),
-                dayworktime_date: date = Form(),
-                dayworktime_start: time = Form(),
-                dayworktime_end: time = Form(),
-                dayworktime_rest: timedelta = Form()):
+@app.post("/dayworktime/input")
+async def dayworktime_input(request : DataRequest):
     
-    #user_id로 user 정보를 가져옴
-    user = await User.filter(id=user_id).first()
-    
-    #dayworktime의 처리
+    # DB에 저장
+    # dayworktime 객체를 생성하고 필드에 값 할당
     dayworktime = DayWorkTime()
-    dayworktime.user_id = user_id
-    dayworktime.dayworktime_date = dayworktime_date
-    dayworktime.dayworktime_start = dayworktime_start
-    dayworktime.dayworktime_end = dayworktime_end
-    dayworktime.dayworktime_rest = dayworktime_rest
-    dayworktime.dayworktime_total = dayworktime_end - dayworktime_start - dayworktime_rest
-    dayworktime.dayworktime_holiday = False
+    dayworktime.user_id = request.user_id
+    dayworktime.dayworktime_date = request.dayworktime_date
     
+    #휴일인경우 0,0,0 값 입력
+    if request.dayworktime_holiday:
+        dayworktime.dayworktime_start = datetime.combine(request.dayworktime_date, time(0,0,0))
+        dayworktime.dayworktime_end = datetime.combine(request.dayworktime_date, time(0,0,0))
+        dayworktime.dayworktime_rest = timedelta(hours=0)
+        dayworktime.dayworktime_total = timedelta(hours=0)
+        dayworktime.dayworktime_holiday = request.dayworktime_holiday
+        await dayworktime.save()
+        
+        # 처리 결과 반환
+        return {"message": str(dayworktime.dayworktime_date)+" 휴일 저장 되었습니다."}
     
-    result = src.insert_time(user, dayworktime)
-    
-    
-    
-    
-    
-    #주당 근무시간 업데이트
-    
-    #주당 근무시간 계산
-    #주당 근무시간 업데이트
-    
-    #주당 근무시간 출력
-    
+    #휴일이 아닌 경우
+    else:
+        dayworktime.dayworktime_start = datetime.combine(request.dayworktime_date, request.dayworktime_start)
+        dayworktime.dayworktime_end = datetime.combine(request.dayworktime_date, request.dayworktime_end)
+        dayworktime.dayworktime_rest = request.dayworktime_rest
+        # Calculate the total work time
+        total_work_time = dayworktime.dayworktime_end - dayworktime.dayworktime_start - request.dayworktime_rest*60
+        dayworktime.dayworktime_total = total_work_time
+        dayworktime.dayworktime_holiday = request.dayworktime_holiday
+        await dayworktime.save()
 
-    
-    
-    
+        result = await timemanage.update_weekly_worktime(dayworktime.user_id, dayworktime.dayworktime_date)
+        
+        # 처리 결과 반환
+        return {"message": str(dayworktime.dayworktime_date)+" 입력 완료 되었습니다."
+                                                             "주간 근무시간 : "+str(result["hours"])+"시간"+str(result["minutes"])+"분"}
 
 
 async def init_db():
     await Tortoise.init(
             db_url='postgres://postgres:claytimetracker@localhost:5432/timetracker',
-            modules={'models': ['model']},
+            modules={'models': ['src.model']},
+            #using 'models' directory
+            #models.py is generated by tortoise-orm
         )
     
     await Tortoise.generate_schemas()
+
+
+#Admin 화면 조회 (1) WorkTimeStandard을 조회해서 넘김 (2) 사용자 중 입력되지 않은 유저들을 리스트로 해서 넘김
+@app.get("/admin", response_class=HTMLResponse)
+async def admin(request: Request):
+
+    unfiled_users = await timemanage.get_unfiled_users()
+    worktimestandard = await timemanage.get_worktimestandard()
+    
+    return templates.TemplateResponse("admin.html", {"request": request, "worktimestandard": worktimestandard, "users": unfiled_users})

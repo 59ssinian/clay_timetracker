@@ -1,5 +1,14 @@
 from tortoise import fields, models
 
+#주당근무시간기준입력
+class WorkTimeStandard(models.Model):
+    id = fields.IntField(pk=True)
+    weekworktimestandard = fields.TimeDeltaField()
+    recordstart = fields.DateField()
+    normaldayworktime = fields.TimeDeltaField(null=True)
+    created_at = fields.DatetimeField(auto_now_add=True)
+    modified_at = fields.DatetimeField(auto_now=True)
+
 #유저 아이디 비밀번호
 class User(models.Model):
     id = fields.IntField(pk=True)
@@ -14,8 +23,8 @@ class DayWorkTime(models.Model):
     id = fields.IntField(pk=True)
     user = fields.ForeignKeyField("models.User", related_name="worktime")
     dayworktime_date = fields.DateField()
-    dayworktime_start = fields.DatetimeField()
-    dayworktime_end = fields.DatetimeField()
+    dayworktime_start = fields.DatetimeField(null=True)
+    dayworktime_end = fields.DatetimeField(null=True)
     dayworktime_rest = fields.TimeDeltaField(null=True)
     dayworktime_total = fields.TimeDeltaField(null=True)
     dayworktime_holiday = fields.BooleanField()
@@ -26,12 +35,9 @@ class DayWorkTime(models.Model):
 class WeekWorkTime(models.Model):
     id = fields.IntField(pk=True)
     user = fields.ForeignKeyField("models.User", related_name="weekworktime")
-    year = fields.IntField()
-    month = fields.IntField()
     weekworktime_start = fields.DateField()
     weekworktime_end = fields.DateField()
-    weekworktime = fields.TimeDeltaField()
-    weekworktime_designated = fields.TimeDeltaField()
+    weekworktime_total = fields.TimeDeltaField()
     weekworktime_over = fields.BooleanField()
     created_at = fields.DatetimeField(auto_now_add=True)
     modified_at = fields.DatetimeField(auto_now=True)
@@ -39,10 +45,10 @@ class WeekWorkTime(models.Model):
 #휴일등록여부
 class Holidays(models.Model):
     id = fields.IntField(pk=True)
-    user = fields.ForeignKeyField("models.User", related_name="holiday")
     holiday_date = fields.DateField()
     created_at = fields.DatetimeField(auto_now_add=True)
     modified_at = fields.DatetimeField(auto_now=True)
+
 
 
 

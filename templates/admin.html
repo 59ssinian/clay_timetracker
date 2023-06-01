@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8">
+	<title>Clay Time Tracker Admin</title>
+	
+	<!-- bulma.css -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma@0.9.4/css/bulma.min.css">
+
+    <!-- Load Axios -->
+    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+
+    <!-- Load Vue.js-->
+    <script src="https://unpkg.com/vue@next"></script>
+</head>
+<body>
+	<div>
+		<section class="is-full section">
+			
+			<div class="columns">
+				
+				<!-- 메뉴 탭 -->
+				<div class="column is-4">
+				
+					<ul>
+					<!-- 전체 화면 조회 -->
+						<li>전체 조회</li>
+					<!-- 개인별 화면 조회 -->
+						<li>개인별 조회</li>
+					<!-- 관리자 세팅 -->
+						<li>관리자 세팅</li>
+					</ul>
+				
+				</div>
+				
+				<!-- 메인 화면 -->
+				<div class="column is-8">
+					
+					<!-- 전체 화면 조회 -->
+						<div id="total view">
+						
+							<!--unfiled_users 출력-->
+							<div>
+								<h1>미입력 사용자</h1>
+								<table>
+									<tr>
+										<th>사용자 이름</th>
+										<th>사용자 아이디</th>
+									</tr>
+									{% for unfiled_user in unfiled_users %}
+									<tr>
+										<td>{{ unfiled_user.username }}</td>
+										<td>{{ unfiled_user.displayname }}</td>
+									</tr>
+									{% endfor %}
+								</table>
+							</div>
+						</div>
+					<!-- 휴일 입력 조회 -->
+						<div id="personal view">
+						
+						</div>
+					<!-- 관리자 세팅 -->
+						<div id="admin setting">
+							<!-- worktimestandard 조회 및 입력 -->
+							<div>
+								<h1>근무시간 기준</h1>
+								<table>
+									<tr>
+										<th>근무기준</th>
+										<th>근무내용</th>
+										<th>수정입력</th>
+									</tr>
+									<tr>
+										<td>주당근무시간</td>
+										<td>{{ worktimestandard.weekworktimestandard }}</td>
+										<td><input type="text" name="weekworktimestandard"></td>
+									</tr>
+									<tr>
+										<td>앱시작일</td>
+										<td>{{ worktimestandard.recordstart }}</td>
+										<td><input type="text" name="recordstart"></td>
+									</tr>
+									<tr>
+										<td>평균근무시간</td>
+										<td>{{ worktimestandard.normaldayworktime }}</td>
+										<td><input type="text" name="normaldayworktime"></td>
+									</tr>
+								</table>
+							</div>
+						</div>
+				</div>
+			</div>
+		</section>
+	</div>
+</body>
+</html>
+
+<script>
+
+
+</script>

@@ -15,68 +15,126 @@
 	
 </head>
 <body>
-	<div>
+	<div id="app">
 		<section class="is-full section">
 			
 			<!-- 근무 시간 입력을 위한 폼 -->
-			<form action="/worktime_process" method="post">
-			
+			<div id="input" class="block">
 			<!-- 이름 표시 -->
-			{{ user.displayname }}
+				<div class="block">
+					<b>{{ user.displayname }}</b>님 안녕하세요.<br>
+					이번주의 총 근무 시간은 <b>{{ weekworktimenow.hours }}시간 {{ weekworktimenow.minutes }}분<b> 입니다.
+					
+				</div>
 				<div class="field" style="display:none;">
 					<label class="label">유저아이디</label>
 					<div class="control">
-						<input class="input" type="number" name="user_id" placeholder="시간을 입력하세요."
-						value="{{user.id}}">
+						<input class="input" type="number" name="user_id" value="{{user.id}}">
 					</div>
 				</div>
 				<div class="field">
 					<label class="label">기록하는 날</label>
 					<div class="control">
-						<input class="input" type="date" name="dayworktime_date" placeholder="시간을 입력하세요."
-						value="{{ date.strftime('%Y-%m-%d') }}">
+						<input v-model="dayworktime_date"
+						       class="input" type="date">
+					</div>
+				</div>
+				<div class="field">
+					<label class="label">휴일여부</label>
+					<div class="">
+						<input v-model="dayworktime_holiday" type="checkbox">
+						휴일이면 체크
 					</div>
 				</div>
 				<div class="field">
 					<label class="label">근무 시작 시간</label>
 					<div class="control">
-						<input class="input" type="time" name="dayworktime_start" placeholder="시간을 입력하세요.">
+						<input v-model="dayworktime_start"
+								class="input" type="time"
+								:class="{ 'disabled-input': dayworktime_holiday }" :disabled="dayworktime_holiday">
 					</div>
 				</div>
 				<div class="field">
 					<label class="label">근무 종료 시간</label>
 					<div class="control">
-						<input class="input" type="time" name="dayworktime_end" placeholder="시간을 입력하세요.">
+						<input v-model="dayworktime_end"
+								class="input" type="time"
+								:class="{ 'disabled-input': dayworktime_holiday }" :disabled="dayworktime_holiday">
 					</div>
 				</div>
 				<div class="field">
 					<label class="label">휴게 시간</label>
 					<div class="control">
-						<input class="input" type="time" name="dayworktime_rest" placeholder="시간을 입력하세요.">
+						<input v-model="dayworktime_rest"
+								class="input" type="time"
+								:class="{ 'disabled-input': dayworktime_holiday }" :disabled="dayworktime_holiday">
 					</div>
 				</div>
 				<div class="field">
 					<div class="control">
-						<button class="button is-link" type="submit">입력</button>
+						<button class="button is-link" type="submit" @click="dayworktime_input">입력</button>
 					</div>
 				</div>
 			
-			</form>
-			
-			
-			<!-- 근무 시작 시간 입력 받음 -->
-			
-			<!-- 근무 종료 시간 입력 받음 -->
-			
-			<!-- 휴게 시간 입력 받음 -->
-			
-			<!-- 입력 버튼 -->
-			
-			
-			
-			
-			
+			</div>
+			<div id="result" class="block">
+				<!-- 총 주당 근무시간 안내 -->
+				[[ this.display_comment ]]
+			</div>
 		</section>
 	</div>
 </body>
 </html>
+
+<script>
+	const app = Vue.createApp({
+        data() {
+            return {
+                // 검색 관련 데이터
+				user_id : '{{user.id}}',
+	            dayworktime_date : "{{ date.strftime('%Y-%m-%d') }}",
+                dayworktime_start : "09:00",
+				dayworktime_end : "18:00",
+	            dayworktime_rest : "01:00",
+	            dayworktime_holiday : false,
+	            
+	            // 미완료 입력 데이터
+                unfinished_date: [],
+	            
+	            // 상태창
+	            display_comment : "시간을 입력하세요.",
+            };
+        },
+        methods: {
+            async dayworktime_input() {
+                this.display_comment = this.dayworktime_date+" 시간을 입력하고 있습니다.";
+				try {
+					const response = await axios.post('/dayworktime/input', {
+						user_id: this.user_id,
+						dayworktime_date: this.dayworktime_date,
+						dayworktime_start: this.dayworktime_start,
+						dayworktime_end: this.dayworktime_end,
+						dayworktime_rest: this.dayworktime_rest,
+						dayworktime_holiday: this.dayworktime_holiday,
+					});
+					this.display_comment = response.data['message']
+                } catch (error) {
+                    this.display_comment = "에러 발생되었습니다. 관리자에게 문의하세요.";
+					console.error(error);
+                }
+            },
+        },
+        delimiters: ['[[', ']]']
+    });
+
+    app.mount('#app');
+
+</script>
+
+<style>
+.disabled-input {
+  background-color: #f5f5f5;
+  color: #f4f4f4;
+  cursor: not-allowed;
+}
+</style>
