@@ -12,6 +12,7 @@ from pydantic import BaseModel
 
 import src.timemanage as timemanage
 
+
 app = FastAPI()
 templates = Jinja2Templates(directory="templates")
 
@@ -146,4 +147,19 @@ async def admin(request: Request):
     unfiled_users = await timemanage.get_unfiled_users()
     worktimestandard = await timemanage.get_worktimestandard()
     
-    return templates.TemplateResponse("admin.html", {"request": request, "worktimestandard": worktimestandard, "users": unfiled_users})
+    return templates.TemplateResponse("admin.html", {"request": request, "worktimestandard": worktimestandard, "unfiled_users": unfiled_users})
+
+
+class DataRequest_worktimestandard(BaseModel):
+    weekworktimestandard : int
+    recordstart: date
+    normaldayworktime : int
+
+#worktimestandard_input 입력
+@app.post("/worktimestandard/input")
+async def worktimestandard_input(request: DataRequest_worktimestandard):
+    
+    #DB에 저장
+    worktimestandard = timemanage.update_worktimestandard(request.weekworktimestandard, request.recordstart, request.normaldayworktime)
+    
+    return worktimestandard

@@ -45,12 +45,12 @@
 								<table>
 									<tr>
 										<th>사용자 이름</th>
-										<th>사용자 아이디</th>
+										<th>마지막 입력일</th>
 									</tr>
 									{% for unfiled_user in unfiled_users %}
 									<tr>
-										<td>{{ unfiled_user.username }}</td>
 										<td>{{ unfiled_user.displayname }}</td>
+										<td>{{ unfiled_user.last_day }}</td>
 									</tr>
 									{% endfor %}
 								</table>
@@ -74,19 +74,24 @@
 									<tr>
 										<td>주당근무시간</td>
 										<td>{{ worktimestandard.weekworktimestandard }}</td>
-										<td><input type="text" name="weekworktimestandard"></td>
+										<td><input v-model="weekworktimestandard" type="number"></td>
 									</tr>
 									<tr>
 										<td>앱시작일</td>
 										<td>{{ worktimestandard.recordstart }}</td>
-										<td><input type="text" name="recordstart"></td>
+										<td><input v-model="recordstart" type="date" name="recordstart"></td>
 									</tr>
 									<tr>
 										<td>평균근무시간</td>
 										<td>{{ worktimestandard.normaldayworktime }}</td>
-										<td><input type="text" name="normaldayworktime"></td>
+										<td><input v-model="normaldayworktime" type="number"></td>
 									</tr>
 								</table>
+								<div class="field">
+									<div class="control">
+										<button class="button is-link" type="submit" @click="worktimestandard_input">입력</button>
+									</div>
+								</div>
 							</div>
 						</div>
 				</div>
@@ -97,6 +102,32 @@
 </html>
 
 <script>
+const app = Vue.createApp({
+    data() {
+        return {
+            // 검색 관련 데이터
+			weekworktimestandard : "{{ worktimestandard.weekworktimestandard }}",
+            recordstart : "{{ worktimestandard.recordstart.strftime('%Y-%m-%d') }}",
+            normaldayworktime : "{{ worktimestandard.normaldayworktime }}",
+        };
+    },
+    methods: {
+        async worktimestandard_input() {
+			try {
+				const response = await axios.post('/dayworktime/input', {
+					weekworktimestandard : this.weekworktimestandard,
+					recordstart : this.recordstart,
+					normaldayworktime : this.normaldayworktime,
+				});
+				});
+            } catch (error) {
+				console.error(error);
+            }
+        },
+    },
+    delimiters: ['[[', ']]']
+});
 
+app.mount('#app');
 
 </script>

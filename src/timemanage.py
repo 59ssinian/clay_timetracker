@@ -160,26 +160,35 @@ def get_current_saturday(date):
 # 전체 유저 중 오늘 날짜를 기준으로 해당 월에 입력되지 않는 날짜들이 있는 유저들을 조회하는 함수
 async def get_unfiled_users():
 	
-	# 오늘 날짜를 기준으로 해당월의 첫째날 조회
-	first_day = date.today().replace(day=1)
-	
+	#오늘 날짜를 기준으로 입력의무가 있는 전일을 조회 : 전일이 일요일인 경우, 금요일로 수정, 전일이 토요일인 경우, 목요일로 수정, 전일이 휴일인 경우 가장 최근 근무일로 수정
+	previousday = date.today() - timedelta(days=1)
+	while await check_holiday(previousday):
+		previousday = previousday - timedelta(days=1)
+		
 	#전체 user 리스트를 조회하고, 각각의 user에 대해서, dayworktime table 에서 first_day부터 어제까지 입력되지 않는 유저들을 조회
 	#전체 user 리스트 조회
 	user_list = await User.all()
 	#각 user별로 dayworktime table에서 first_day부터 어제까지 입력되지 않는 유저들을 조회
 	unfiled_user_list = []
-	for user in user_list:
-		#dayworktime table에서 first_day부터 어제까지 입력되지 않는 유저들을 조회
-		unfiled_user = await DayWorkTime.filter(user=user.id, dayworktime_date__gte=first_day, dayworktime_date__lte=date.today()-timedelta(days=1)).first()
-		if unfiled_user:
-			unfiled_user_list.append(user)
 	
+	for user in user_list:
+		#dayworktime table에서 입력된 마지막 날짜를 조회
+		last_day = await DayWorkTime.filter(user=user.id).order_by('-dayworktime_date').first()
+		
+		#입력된 마지막 날짜가 previousday가 아니면 unfiled_user_list에 추가
+		if last_day:
+			if previousday != last_day.dayworktime_date:
+				unfiled_user_list.append({"displayname": user.displayname, "user_id": user.id, "last_day" : last_day.dayworktime_date})
+		else:
+			unfiled_user_list.append({"displayname": user.displayname, "user_id": user.id, "last_day" : "날짜없음"})
+	
+	print(unfiled_user_list)
 	return unfiled_user_list
 
 
 
 # WorkTimeStandard에 기준값 입력 또는 업데이트
-async def insert_worktimestandard(weekworktimestandard, recordstart, normaldayworktime):
+async def update_worktimestandard(weekworktimestandard, recordstart, normaldayworktime):
 	
 	# 기준값이 있는지 체크
 	worktimestandard_exist = await WorkTimeStandard.first()
