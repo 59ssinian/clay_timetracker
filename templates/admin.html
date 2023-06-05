@@ -14,7 +14,7 @@
     <script src="https://unpkg.com/vue@next"></script>
 </head>
 <body>
-	<div>
+	<div id="app">
 		<section class="is-full section">
 			
 			<div class="columns">
@@ -73,8 +73,8 @@
 									</tr>
 									<tr>
 										<td>주당근무시간</td>
-										<td>{{ worktimestandard.weekworktimestandard }}</td>
-										<td><input v-model="weekworktimestandard" type="number"></td>
+										<td>{{ worktimestandard.weekworktimestandard_hours }}</td>
+										<td><input v-model="weekworktimestandard_hours" type="number"></td>
 									</tr>
 									<tr>
 										<td>앱시작일</td>
@@ -83,8 +83,8 @@
 									</tr>
 									<tr>
 										<td>평균근무시간</td>
-										<td>{{ worktimestandard.normaldayworktime }}</td>
-										<td><input v-model="normaldayworktime" type="number"></td>
+										<td>{{ worktimestandard.normaldayworktime_hours }}</td>
+										<td><input v-model="normaldayworktime_hours" type="number"></td>
 									</tr>
 								</table>
 								<div class="field">
@@ -106,20 +106,24 @@ const app = Vue.createApp({
     data() {
         return {
             // 검색 관련 데이터
-			weekworktimestandard : "{{ worktimestandard.weekworktimestandard }}",
+			weekworktimestandard_hours : "{{ worktimestandard.weekworktimestandard_hours }}",
             recordstart : "{{ worktimestandard.recordstart.strftime('%Y-%m-%d') }}",
-            normaldayworktime : "{{ worktimestandard.normaldayworktime }}",
+            normaldayworktime_hours : "{{ worktimestandard.normaldayworktime_hours }}",
         };
     },
     methods: {
         async worktimestandard_input() {
+			console.log(this.weekworktimestandard_hours)
+	        console.log(this.recordstart)
+	        console.log(this.normaldayworktime_hours)
+	        
 			try {
-				const response = await axios.post('/dayworktime/input', {
-					weekworktimestandard : this.weekworktimestandard,
+				const response = await axios.post('/worktimestandard/input', {
+					weekworktimestandard_hours : this.weekworktimestandard_hours,
 					recordstart : this.recordstart,
-					normaldayworktime : this.normaldayworktime,
+					normaldayworktime_hours : this.normaldayworktime_hours,
 				});
-				});
+				console.log(response);
             } catch (error) {
 				console.error(error);
             }

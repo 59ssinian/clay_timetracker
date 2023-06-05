@@ -1,5 +1,8 @@
+import holidays as holidays
+from dateutil.relativedelta import relativedelta
+
 from src.model import User, DayWorkTime, WeekWorkTime, Holidays, WorkTimeStandard
-from datetime import datetime, date, timedelta
+from datetime import datetime, date, timedelta, time
 from tortoise.queryset import Q
 
 
@@ -28,8 +31,7 @@ async def update_weekly_worktime(user_id, dayworktime_date):
 			worktime += dayworktime.dayworktime_total
 	
 	# weekworktimestandard를 이용하여 주당 근무시간 기준시간인 weekworktimestandard값을 불러들임
-	#worktimestandard = await WorkTimeStandard.first().weekworktimestandard
-	worktimestandard = timedelta(hours=40)
+	worktimestandard = await WorkTimeStandard.first().weekworktimestandard
 	
 	# 주간 근무시간이 기준시간보다 작으면 true 크면 false 반환
 	if worktime < worktimestandard:
@@ -94,54 +96,73 @@ async def weekly_worktime_now(user_id, dayworktime_date):
 	hours = int(total_seconds // 3600)
 	minutes = int((total_seconds % 3600) // 60)
 	
-	result = {'weekworktime_start': weekworktime_start, 'weekworktime_end': weekworktime.weekworktime_end,
-	          'weekworktime_total': weekworktime.weekworktime_total, 'weekworktime_over': weekworktime.weekworktime_over, 'hours': hours,
-	          'minutes': minutes}
+	result = {'hours': hours, 'minutes': minutes}
 	
 	return result
 
 #날짜가 입력되면, holidate_date가 휴일인지 체크하는 함수
 async def check_holiday(dayworktime_date):
 	
-	# DB에 같은날짜에 값이 있는지 체크
-	ifholiday = await Holidays.filter(holiday_date=dayworktime_date).first()
+	# 해당일자가 휴일인지 체크
+	holiday = await Holidays.filter(holiday_date=dayworktime_date).first()
 	
-	if ifholiday:
-		# 값이 있으면 true 반환
-		return True
-	else:
-		# 값이 없으면 해당 일이 토요일 또는 일요인지 체크하고, 토요일 또는 일요일이면 HOLIDAYS에 휴일 입력하고, TRUE 반환
-		if dayworktime_date.weekday() == 5 or dayworktime_date.weekday() == 6:
-			await Holidays.create(holiday_date=dayworktime_date)
+	if holiday:
+		if holiday.isholiday:
 			return True
 		else:
-			# 토요일 또는 일요일이 아니면 FALSE 반환
 			return False
+	else:
+		return None
+	
+	
 
-#해당일을 휴일로 입력하는 함수
-async def insert_holiday(dayworktime_date):
-	await Holidays.create(holiday_date=dayworktime_date)
+	
+	
+	
 	
 	
 #유저 아이디를 입력하면, 가장 마지막으로 입력된 날짜로부터 휴일을 제외한 그 다음 날짜를 반환하는 함수
 async def get_input_day(user_id):
-	
-	#
-	
-	
+	print("get_input_day 함수 실행")
 	# DB에 같은날짜에 값이 있는지 체크
-	ifdayworktime = await DayWorkTime.filter(user_id=user_id).order_by('-dayworktime_date').first()
-	
-	# 값이 있으면, 그 다음날짜부터 휴일인이 여부를 체크하고 휴일인 경우 '휴일로 입력하고', 휴일이 아닌 가장 마지막 날짜를 반환
+	ifdayworktime = await DayWorkTime.filter(user_id=user_id).order_by('-id').order_by('-dayworktime_date').first()
+	# 오늘날짜를 구함
+	today = datetime.today().date()
+	# 값이 있으면, 그 다음날짜를 오늘이 될때까지 반복하고, 해당 날짜가 휴일인 경우 '휴일로 입력하고', 휴일이 아닌 가장 마지막 날짜를 반환
 	if ifdayworktime:
-		dayworktime_date = ifdayworktime.dayworktime_date + timedelta(days=1)
-		print(dayworktime_date)
-		while check_holiday(dayworktime_date):
-			insert_holiday(user_id, dayworktime_date)
-			dayworktime_date = dayworktime_date + timedelta(days=1)
+		workdate = ifdayworktime.dayworktime_date + timedelta(days=1)
+		print("값이있음")
+		print(workdate, today)
+		while workdate <= today:
+			holiday = await check_holiday(workdate)
+			if holiday:
+				# 휴일이면, 휴일로 입력하고, 다음날짜로 넘어감
+				await insert_holiday(user_id, workdate)
+			print(workdate.strftime('%Y-%m-%d'))
+			workdate = workdate + timedelta(days=1)
+	else:
+		# 값이 없으면, 오늘날짜를 반환
+		print("값이없음")
+		workdate = today
+	
+	if (workdate > today):
+		workdate = today
+	
+	# 오늘날짜가 되면, 오늘날짜를 반환
+	return workdate
 			
-			print(dayworktime_date)
-	return dayworktime_date
+		
+# user_id 및 holiday를 입력받으면, dayworktime table에 holiday로 입력하는 함수
+async def insert_holiday(user_id, holiday_date):
+	dayworktime = DayWorkTime()
+	dayworktime.dayworktime_start = datetime.combine(holiday_date, time(0, 0, 0))
+	dayworktime.dayworktime_end = datetime.combine(holiday_date, time(0, 0, 0))
+	dayworktime.dayworktime_rest = timedelta(hours=0)
+	dayworktime.dayworktime_total = timedelta(hours=0)
+	dayworktime.dayworktime_holiday = True
+	await dayworktime.save()
+	
+	return True
 	
 	
 def get_previous_sunday(date):
@@ -210,3 +231,95 @@ async def get_worktimestandard():
 	worktimestandard_exist = await WorkTimeStandard.first()
 	
 	return worktimestandard_exist
+
+# user_id, worktimedate를 입력받고 해당 날짜의 정보 반환
+async def get_dayworktime(user_id, worktimedate):
+	
+	# DB에서 user_id, dayworktime_date가 일치하는 데이터를 조회하고. 이중 가장 마지막에 생성된 데이터를 조회
+	dayworktime_exist = await DayWorkTime.filter(user_id=user_id, dayworktime_date=worktimedate).order_by('-created_at').first()
+	
+	return dayworktime_exist
+
+
+# 해당 년을 입력하면, 해당 년도 휴일을 holidays 모듈에서 kor public holidays를 조회하여 입력하는 함수
+async def insert_holidays(year):
+	# 해당 년도의 월에 휴일을 holidays 모듈에서 kor public holidays를 조회하여 입력
+	kor_holidays = holidays.KR(years=year)
+	
+	# 해당 년도의 1월 1일부터 12월 31일까지 카운트 하면서, 휴일인 경우 isholiday=true, 휴일이 아닌 경우 isholiday=false로 입력
+	for month in range(1, 13):
+		for day in range(1, 32):
+			
+			try:
+				
+				if date(year, month, day) in kor_holidays:
+					isholiday = True
+				else:
+					isholiday = False
+				
+				#이미 해당 날짜에 입력된 값이 있는지 체크
+				holiday_exist = await Holidays.filter(holiday_date=date(year, month, day)).first()
+				
+				#입력된 값이 있는 경우 isholiday 값만 업데이트
+				if holiday_exist:
+					print("이미 입력된 값이 있습니다.")
+				#입력된 값이 없는 경우, 해당 날짜를 holiday table에 삽입
+				else:
+					await Holidays.create(holiday_date=date(year, month, day), isholiday=isholiday, ifmodified=False)
+					
+			except:
+				print("해당 날짜가 없습니다.")
+				
+	return True
+
+# 해당 년, 월, 일을 date로 입력하면, 해당 일자를 holiday table에서 수정하는 함수
+async def update_holidays(holidays_date, isholiday):
+	
+	# 해당 년, 월, 일을 date로 입력하면, 해당 일자의 isholiday를 holiday table에서 수정하고, ismodified=True로 수정
+	holiday_exist = await Holidays.filter(holiday_date=holidays_date).first()
+	
+	if holiday_exist:
+		holiday_exist.isholiday = isholiday
+		holiday_exist.ifmodified = True
+		await holiday_exist.save()
+	else:
+		await Holidays.create(holiday_date=holidays_date, isholiday=isholiday, ifmodified=True)
+		
+	return True
+
+#해당 년, 월을 입력하면, 해당 년, 월의 휴일을 holidays table에서 조회하여, 리스트로 반환하는 함수
+async def get_holidays(year, month):
+	
+	#해당 년, 월의 휴일을 holidays table에서 조회하여, 리스트로 반환
+	holidays_list = await Holidays.filter(holiday_date__year=year, holiday_date__month=month).order_by('holiday_date')
+	
+	return holidays_list
+	
+
+#오늘날짜를 기준으로 다음달 1일의 holiday 정보가 없는 경우, insert_holydays에 다음달 1일의 해를 입력하여 실행
+async def init_holiday():
+	
+	#오늘날짜를 기준으로 다음달 1일의 holiday 정보가 없는 경우, insert_holydays에 다음달 1일의 해를 입력하여 실행
+	today = datetime.today().date()
+	next_month = today + relativedelta(months=1)
+	
+	#다음달 1일의 holiday 정보가 없는 경우, insert_holydays에 다음달 1일의 해를 입력하여 실행
+	holiday_exist = await Holidays.filter(holiday_date=next_month).first()
+	
+	if holiday_exist==None:
+		print("init holiday : " + str(next_month.year))
+		await insert_holidays(next_month.year)
+		
+	return True
+
+
+async def is_recorded(user_id, input_date):
+
+	#해당 날짜에 해당하는 DayWorkTime이 있는지 조회
+	dayworktime_exist = await DayWorkTime.filter(user_id=user_id, dayworktime_date=input_date).first()
+	
+	#해당 날짜에 해당하는 DayWorkTime이 있는 경우 True, 없는 경우 False 반환
+	if dayworktime_exist:
+		return True
+	else:
+		return False

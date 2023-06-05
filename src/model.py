@@ -46,6 +46,9 @@ class WeekWorkTime(models.Model):
 class Holidays(models.Model):
     id = fields.IntField(pk=True)
     holiday_date = fields.DateField()
+    holiday_name = fields.CharField(null=True, max_length=30)
+    isholiday = fields.BooleanField()
+    ifmodified = fields.BooleanField()
     created_at = fields.DatetimeField(auto_now_add=True)
     modified_at = fields.DatetimeField(auto_now=True)
 
