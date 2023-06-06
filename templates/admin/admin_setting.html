@@ -26,19 +26,19 @@
 						<p class="panel-heading">
 							Clay Time Tracker
 						</p>
-						<a class="panel-block is-active">
+						<a class="panel-block is-active" href="/admin/uninputlist">
 							<span class="panel-icon">
 								<i class="fas fa-book" aria-hidden="true"></i>
 							</span>
-							전체 화면 조회
+							미입력자 조회
 						</a>
-						<a class="panel-block">
+						<a class="panel-block" href="/admin/yearmonthlist/none">
 							<span class="panel-icon">
 								<i class="fas fa-book" aria-hidden="true"></i>
 							</span>
-							개인별 화면 조회
+							월별 전체 조회
 						</a>
-						<a class="panel-block">
+						<a class="panel-block" href="/admin/setting">
 							<span class="panel-icon">
 								<i class="fas fa-book" aria-hidden="true"></i>
 							</span>
@@ -50,39 +50,6 @@
 				<!-- 메인 화면 -->
 				<div class="column is-9">
 					
-					<!-- 전체 화면 조회 -->
-						<div id="total view" class="block">
-							<section class="hero">
-								<div class="hero-body">
-									<p class="title">
-									미입력자 조회(오늘기준)
-									</p>
-									<p class="subtitle">
-									당일 기준으로 입력되지 않은 사용자를 조회합니다.
-									</p>
-								</div>
-							</section>
-							
-							<!--unfiled_users 출력-->
-							<section class="box hero block">
-								<table class="table">
-									<tr>
-										<th>사용자 이름</th>
-										<th>마지막 입력일</th>
-									</tr>
-									{% for unfiled_user in unfiled_users %}
-									<tr>
-										<td>{{ unfiled_user.displayname }}</td>
-										<td>{{ unfiled_user.last_day }}</td>
-									</tr>
-									{% endfor %}
-								</table>
-							</section>
-						</div>
-					<!-- 휴일 입력 조회 -->
-						<div id="personal view">
-						
-						</div>
 					<!-- 관리자 세팅 -->
 						<div id="admin setting">
 							<!-- worktimestandard 조회 및 입력 -->
@@ -97,8 +64,7 @@
 								</div>
 							</section>
 							
-							<section>
-								<h1>근무시간 기준</h1>
+							<section class="box hero block">
 								<table class="table">
 									<tr>
 										<th>근무기준</th>
@@ -108,17 +74,17 @@
 									<tr>
 										<td>주당근무시간</td>
 										<td>{{ worktimestandard.weekworktimestandard_hours }}</td>
-										<td><input v-model="weekworktimestandard_hours" type="number"></td>
+										<td><input class="input is-small" v-model="weekworktimestandard_hours" type="number"></td>
 									</tr>
 									<tr>
 										<td>앱시작일</td>
 										<td>{{ worktimestandard.recordstart }}</td>
-										<td><input v-model="recordstart" type="date" name="recordstart"></td>
+										<td><input class="input is-small" v-model="recordstart" type="date" name="recordstart"></td>
 									</tr>
 									<tr>
 										<td>평균근무시간</td>
 										<td>{{ worktimestandard.normaldayworktime_hours }}</td>
-										<td><input v-model="normaldayworktime_hours" type="number"></td>
+										<td><input class="input is-small" v-model="normaldayworktime_hours" type="number"></td>
 									</tr>
 								</table>
 								<div class="field">

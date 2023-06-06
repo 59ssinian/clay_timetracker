@@ -35,7 +35,7 @@
 					<label class="label" v-if="isrecorded">기록된 날</label>
 					<div class="control">
 						<input v-model="dayworktime_date"
-						       class="input" type="date" :max="today" >
+						       class="input is-large" type="date" :max="today" >
 					</div>
 				</div>
 				<div class="field">
@@ -48,7 +48,7 @@
 					<label class="label">근무 시작 시간</label>
 					<div class="control">
 						<input v-model="dayworktime_start"
-								class="input" type="time"
+								class="input is-large" type="time"
 								:class="{ 'disabled-input': dayworktime_holiday }" :disabled="dayworktime_holiday">
 					</div>
 				</div>
@@ -56,16 +56,29 @@
 					<label class="label">근무 종료 시간</label>
 					<div class="control">
 						<input v-model="dayworktime_end"
-								class="input" type="time"
+								class="input is-large" type="time"
 								:class="{ 'disabled-input': dayworktime_holiday }" :disabled="dayworktime_holiday">
 					</div>
 				</div>
 				<div class="field">
 					<label class="label">휴게 시간</label>
 					<div class="control">
-						<input v-model="dayworktime_rest"
-								class="input" type="time" pattern="([01]?[0-9]|2[0-3]):[0-5][0-9]" step="1800"
-								:class="{ 'disabled-input': dayworktime_holiday }" :disabled="dayworktime_holiday">
+						<div class="level is-mobile">
+							<div class="level-left">
+								<div class="level-item">
+								<input v-model="dayworktime_rest_hour" style="width:4em;"
+										class="input" type="number" min="0" max="8"
+										:class="{ 'disabled-input': dayworktime_holiday }" :disabled="dayworktime_holiday">
+								</div>
+								<div class="level-item">&nbsp;시간</div>
+								<div class="level-item">
+								<input v-model="dayworktime_rest_minute" style="width:4em;"
+									class="input" type="number" min="0" max="60"
+									:class="{ 'disabled-input': dayworktime_holiday }" :disabled="dayworktime_holiday">
+								</div>
+								<div class="level-item">&nbsp;분</div>
+							</div>
+						</div>
 					</div>
 				</div>
 				<div class="field">
@@ -92,16 +105,12 @@
                 // 검색 관련 데이터
 				user_id : '{{user.id}}',
 	            dayworktime_date : "{{ date.strftime('%Y-%m-%d') }}",
-                dayworktime_start : "{{ dayworktime_start }}",
-				dayworktime_end : "{{ dayworktime_end }}",
-	            dayworktime_rest : "{{ dayworktime_rest }}",
+                dayworktime_start : "09:00",
+				dayworktime_end : "18:00",
+	            dayworktime_rest_hour : "01",
+	            dayworktime_rest_minute : "00",
 	            dayworktime_holiday : false,
-	            
-	            // 미완료 입력 데이터
-                unfinished_date: [],
-	            
-	            // 기존의 입력 여부
-	            isrecorded : '{{ isrecorded }}',
+	            isrecorded : false,
 	            
 	            // 상태창
 	            display_comment : "이번주의 총 근무 시간은 {{ weekworktimenow.hours }}시간 {{ weekworktimenow.minutes }}분 입니다.",
@@ -112,6 +121,9 @@
 				const todayDate = new Date();
 				return todayDate.toISOString().split('T')[0];
 			},
+        },
+		created() {
+            this.updateDatabase(); // 최초 한 번만 실행되는 함수 호출
         },
 		watch: {
             dayworktime_date(newValue, oldValue) {
@@ -127,7 +139,7 @@
 						dayworktime_date: this.dayworktime_date,
 						dayworktime_start: this.dayworktime_start,
 						dayworktime_end: this.dayworktime_end,
-						dayworktime_rest: this.dayworktime_rest,
+						dayworktime_rest: this.dayworktime_rest_hour*60+this.dayworktime_rest_minute,
 						dayworktime_holiday: this.dayworktime_holiday,
 					});
 					this.display_comment = response.data['message']
@@ -145,7 +157,8 @@
 					this.display_comment = this.dayworktime_date+" : "+update.data['message'];
 					this.dayworktime_start = update.data['dayworktime_start'];
 					this.dayworktime_end = update.data['dayworktime_end'];
-					this.dayworktime_rest = update.data['dayworktime_rest'];
+					this.dayworktime_rest_hour = update.data['dayworktime_rest_hour'];
+					this.dayworktime_rest_minute = update.data['dayworktime_rest_minute'];
 					this.dayworktime_holiday = update.data['dayworktime_holiday'];
 					this.isrecorded = update.data['isrecorded'];
 					
