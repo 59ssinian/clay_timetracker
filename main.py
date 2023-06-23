@@ -1,16 +1,15 @@
 
-from fastapi import FastAPI, Request, Form, HTTPException, Depends
+from fastapi import FastAPI, Request, HTTPException, Depends
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
 
-from src.model import User, DayWorkTime, WeekWorkTime, Holidays, WorkTimeStandard
+from src.model.model import User, DayWorkTime, WeekWorkTime, Holidays, WorkTimeStandard
 from tortoise import Tortoise
 
 from datetime import datetime, date, time, timedelta
 from pydantic import BaseModel
-from fastapi.responses import JSONResponse
 from src.api.auth import router as login_router # import router from process/prices.py
 
 import src.timemanage as timemanage
