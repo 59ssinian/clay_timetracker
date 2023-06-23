@@ -3,14 +3,21 @@
   <component name="PublishConfigData" autoUpload="Always" serverName="ubuntu@3.34.198.181:22 key" remoteFilesAllowedToDisappearOnAutoupload="false" confirmBeforeUploading="false">
     <option name="confirmBeforeUploading" value="false" />
     <serverData>
-      <paths name="ubuntu@13.125.162.70:22 key">
+      <paths name="CLAY / ubuntu@3.34.198.181:22 key">
+        <serverdata>
+          <mappings>
+            <mapping deploy="/home/ubuntu" local="$PROJECT_DIR$" web="/" />
+          </mappings>
+        </serverdata>
+      </paths>
+      <paths name="ONUMAPLI / ubuntu@3.39.195.177:22 key (2)">
         <serverdata>
           <mappings>
             <mapping local="$PROJECT_DIR$" web="/" />
           </mappings>
         </serverdata>
       </paths>
-      <paths name="ubuntu@13.125.88.32:22 key">
+      <paths name="ubuntu@13.125.250.47:22 key">
         <serverdata>
           <mappings>
             <mapping local="$PROJECT_DIR$" web="/" />
@@ -20,14 +27,7 @@
       <paths name="ubuntu@3.34.198.181:22 key">
         <serverdata>
           <mappings>
-            <mapping deploy="/tmp/pycharm_project_914" local="$PROJECT_DIR$" />
-          </mappings>
-        </serverdata>
-      </paths>
-      <paths name="ubuntu@3.39.195.177:22 key">
-        <serverdata>
-          <mappings>
-            <mapping local="$PROJECT_DIR$" web="/" />
+            <mapping deploy="/home/ubuntu" local="$PROJECT_DIR$" />
           </mappings>
         </serverdata>
       </paths>

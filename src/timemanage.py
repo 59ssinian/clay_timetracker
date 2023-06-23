@@ -3,7 +3,7 @@ import calendar
 import holidays as holidays
 from dateutil.relativedelta import relativedelta
 
-from src.model import User, DayWorkTime, WeekWorkTime, Holidays, WorkTimeStandard
+from src.model.model import User, DayWorkTime, WeekWorkTime, Holidays, WorkTimeStandard
 from datetime import datetime, date, timedelta, time
 from tortoise.queryset import Q
 

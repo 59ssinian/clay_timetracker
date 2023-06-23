@@ -11,10 +11,14 @@ from tortoise import Tortoise
 from datetime import datetime, date, time, timedelta
 from pydantic import BaseModel
 from fastapi.responses import JSONResponse
+from src.api.auth import router as login_router # import router from process/prices.py
 
 import src.timemanage as timemanage
 
 app = FastAPI()
+
+app.include_router(login_router, prefix="/auth", tags=["auth"])
+
 templates = Jinja2Templates(directory="templates")
 security = HTTPBasic()
 
@@ -22,6 +26,7 @@ security = HTTPBasic()
 origins = [
     "http://localhost",
     "http://localhost:8080",
+    "http://localhost:9000",
     "http://3.34.198.181:8000"
 ]
 
@@ -42,44 +47,6 @@ async def startup():
 async def shutdown():
     await Tortoise.close_connections()
 
-
-
-@app.get("/", response_class=HTMLResponse)
-async def root(request: Request):
-    #로그인 화면으로 이동
-    return templates.TemplateResponse("login.html", {"request": request})
-
-@app.get("/signup", response_class=HTMLResponse)
-async def root(request: Request):
-    #회원가입 화면으로 이동
-    return templates.TemplateResponse("signup.html", {"request": request})
-
-
-#회원가입 시 입력한 정보를 받아서 DB에 저장
-@app.post("/signup_process")
-async def signup(request: Request, username: str = Form(),
-                 password: str = Form(),
-                 displayname: str = Form()):
-
-    #DB에 저장
-    user = await User.create(username=username, password=password, displayname=displayname)
-    return templates.TemplateResponse("login.html", {"request": request})
-
-
-#로그인 정보 입력 시에 로그인 확인
-@app.post("/login_process")
-async def login(request: Request, username: str = Form(),
-                    password: str = Form()):
-    # DB에서 username, password 확인
-    user = await User.filter(username=username, password=password).first()
-    # 유저 있는 경우 login_process 진행
-    if user:
-        context = await timemanage.login_process(user)
-        context["request"] = request
-        return templates.TemplateResponse("index.html", context)
-    
-    else:
-        return templates.TemplateResponse("login.html", {"message": "로그인 정보가 일치하지 않습니다.", "request": request})
 
 
 class DataRequest_worktime_input(BaseModel):
