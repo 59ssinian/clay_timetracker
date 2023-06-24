@@ -1,52 +1,109 @@
-import calendar
+# BASE import
+from fastapi import APIRouter, HTTPException
 
-import holidays as holidays
-from dateutil.relativedelta import relativedelta
-
-from src.model.model import User, DayWorkTime, Holidays, WorkTimeStandard
-from datetime import datetime, date, timedelta, time
+# DB import
 from tortoise.queryset import Q
+from dateutil.relativedelta import relativedelta
+from pydantic import BaseModel
+from src.model.model import User, DayWorkTime, Holidays, WorkTimeStandard
+
+# Utils
+import calendar
+import holidays as holidays
+from datetime import datetime, date, timedelta, time
 
 
-'''
-***** 로그인 프로세스 *****
-'''
-#
-# # 로그인 프로세스
-# async def login_process(user):
-# 	# 마지막 기재되지 않는 날짜가 있으면 그 날짜에서 시작
-# 	input_date = await get_input_day(user.id)
-#
-# 	if input_date == None:
-# 		input_date = await get_worktimestandard.recordstart()
-#
-# 	# 주간 근무시간 계산
-# 	weekworktimenow = await weekly_worktime_now(user.id, input_date)
-# 	context = {"user": user, "date": input_date, "weekworktimenow": weekworktimenow}
-#
-# 	# 기존 값 조회
-# 	dayworktime = await get_dayworktime(user.id, input_date)
-#
-# 	context["dayworktime_holiday"] = await check_holiday(input_date)
-#
-# 	if dayworktime:
-# 		context["dayworktime_start"]= dayworktime.dayworktime_start
-# 		context["dayworktime_end"]= dayworktime.dayworktime_end
-# 		context["dayworktime_rest_hour"]= get_hour(dayworktime.dayworktime_rest)
-# 		context["dayworktime_rest_minute"]= get_minute(dayworktime.dayworktime_rest)
-# 		context["isrecorded"]= True
-#
-# 	else:
-# 		context["dayworktime_start"] = "09:00"
-# 		context["dayworktime_end"] = "18:00"
-# 		context["dayworktime_rest_hour"] = 1
-# 		context["dayworktime_rest_minute"] = 00
-# 		context["isrecorded"] = False
-#
-# 	return context
+# 유저 아이디를 입력 받고, 입력일에 해당하는 달을 기준으로 입력된 정보, 휴일 정보, 공식 휴일 정보, 근부 시간 정보를 반환
+# 이것은 신규 아이디로 로그인 했을 때와, 월이 변경되었을 때로 진행함. 입력 정보는 아이디와, 현재 일자를 기준으로 조회함
 
-# 유저 아이디를 입력하면, 가장 마지막으로 입력된 날짜로부터 휴일을 제외한 그 다음 날짜를 반환하는 함수
+# ROUTER 설정
+router = APIRouter()
+
+
+@router.get("/information/{user_id}")
+async def get_information(user_id: int):
+	#DayWorkTime을 조회하여, 회원 가입일 이후 가장 마지막에 입력된 날짜를 반환
+	input_date = await get_input_day(user_id);
+	
+	#inputdate를 기준으로 get_input_information을 적용하고, 값을 반환하여, frontend에 반환
+	information = await get_input_information(user_id, input_date)
+	
+	return information
+
+
+
+# 아이디와 입력일을 입력 받아, 해당하는 월의 DayWorkTime의 모든 정보를 반환
+async def get_input_information(user_id, input_date):
+	
+	# 입력일의 월의 첫번째 날짜를 구함
+	input_first_day = input_date.replace(day=1)
+	
+	# 아이디를 기준으로 User DB에 접근하여 해당 아이디의 created_at(datetime값)을 date 타입으로 변환하여 반환
+	user_created_at_datetime = await User.filter(id=user_id).values('created_at')
+	user_created_at = user_created_at_datetime[0]['created_at'].date()
+	
+	# 만일 첫번째 날짜가 회원 가입일 이전이라면, 회원 가입일을 input_first_day로 지정
+	if input_first_day < user_created_at:
+		input_first_day = user_created_at
+		
+	# input_first_day가 포함된 달의 마지막 날짜를 구함.
+	input_last_day = input_first_day.replace(day=calendar.monthrange(input_first_day.year, input_first_day.month)[1])
+	
+	# 입력일의 월의 첫번째 날짜와 마지막 날짜 사이의 DayWorkTime 중 입력된 값이 존재하고, dayworktime_isdayoff가 false인 날짜의 정보를 조회
+	input_dayworktime = await DayWorkTime.filter(user_id=user_id, dayworktime_date__range=[input_first_day, input_last_day], dayworktime_isdayoff=False)
+	
+	# input_dayworktime의 정보 중 입력된 날짜만을 리스트로 반환
+	dayworktime_list = []
+	for dayworktime in input_dayworktime:
+		dayworktime_list.append(dayworktime)
+		
+	
+	# 입력일의 월의 첫번째 날짜와 마지막 날짜 사이의 DayWorkTime 중 dayworktime_isdayoff가 true인 날짜를 조회하여, date만의 리스트로 반환
+	dayworktime_date_dayoffs = await DayWorkTime.filter(user_id=user_id, dayworktime_date__range=[input_first_day, input_last_day], dayworktime_isdayoff=True).values('dayworktime_date')
+	dayoffs_list = []
+	for dayoff in dayworktime_date_dayoffs:
+		dayoffs_list.append(dayoff['dayworktime_date'])
+	
+	
+	# 입력일의 월의 첫번째 날짜와 마지막 날짜 사이의 Holidays를 조회하여, isholiday가 true인 date만의 리스트로 반환
+	holiday_date_holidays = await Holidays.filter(holiday_date__range=[input_first_day, input_last_day], isholiday=True).values('holiday_date')
+	holidays_list = []
+	for holiday in holiday_date_holidays:
+		holidays_list.append(holiday['holiday_date'])
+	
+	
+	#input_first_day부터 오늘까지, 순차적으로 조회하면서,
+	# (1) dayworktime_list에 있는 경우, (2) dayoffs_list에 있는 경우, (3) holidays_list에 있는 경우를 제외한 리스트를 missing list로 반환
+	missing_list = []
+	input_today = date.today()
+	for i in range((input_today - input_first_day).days + 1):
+		day = input_first_day + timedelta(days=i)
+		if day not in dayworktime_list and day not in dayoffs_list and day not in holidays_list:
+			missing_list.append(day)
+			
+	# 반환할 값들 print
+	print("input_dayworktime : ", input_dayworktime)
+	print("dayworktime_list : ", dayworktime_list)
+	print("dayoffs_list : ", dayoffs_list)
+	print("holidays_list : ", holidays_list)
+	print("missing_list : ", missing_list)
+	
+	
+	# 반환할 값들을 딕셔너리로 저장
+	result = {'input_date': input_date, # '2021-01-01'
+		'dayworktime_detail_list': input_dayworktime,
+	           'input_days_list' : dayworktime_list,
+	           'dayoffs_list': dayoffs_list,
+	           'holidays_list': holidays_list,
+	           'missing_list': missing_list}
+	
+	return result
+	
+
+# 현재 입력해야 하는 날짜 반환
 async def get_input_day(user_id):
+	# 유저 아이디를 입력하면, 가장 마지막으로 입력된 날짜로부터 휴일을 제외한 그 다음 날짜를 반환하는 함수
+	
 	print("get_input_day 함수 실행")
 	# DB에 같은날짜에 값이 있는지 체크
 	ifdayworktime = await DayWorkTime.filter(user_id=user_id).order_by('-id').order_by('-dayworktime_date').first()
@@ -74,6 +131,7 @@ async def get_input_day(user_id):
 	
 	# 오늘날짜가 되면, 오늘날짜를 반환
 	return workdate
+
 
 
 '''
