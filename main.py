@@ -8,10 +8,13 @@ from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from src.model.model import User, DayWorkTime, Holidays, WorkTimeStandard
 from tortoise import Tortoise
 
+from src.api.init import init_holiday, init_worktimestandard
+
 from datetime import datetime, date, time, timedelta
 from pydantic import BaseModel
 from src.api.auth import router as login_router
 from src.api.timetrack import router as time_router
+from src.api.admin import router as admin_router
 
 import src.timemanage as timemanage
 
@@ -19,9 +22,8 @@ app = FastAPI()
 
 app.include_router(login_router, prefix="/auth", tags=["auth"])
 app.include_router(time_router, prefix="/time", tags=["time"])
+app.include_router(admin_router, prefix="/admin", tags=["admin"])
 
-templates = Jinja2Templates(directory="templates")
-security = HTTPBasic()
 
 # for front-end
 origins = [
@@ -42,60 +44,14 @@ app.add_middleware(
 @app.on_event("startup")
 async def startup():
     await init_db()
-    await timemanage.init_holiday()
+    await init_holiday()
+    await init_worktimestandard()
 
 @app.on_event("shutdown")
 async def shutdown():
     await Tortoise.close_connections()
 
-
-
-class DataRequest_worktime_input(BaseModel):
-    user_id: int
-    dayworktime_date: date
-    dayworktime_start: time
-    dayworktime_end: time
-    dayworktime_rest: timedelta
-    dayworktime_holiday: bool
-
-# 시간정보를 입력 받고, 주당 근무시한을 계산하여 입력하고, 이를 출력해서 보여줌
-@app.post("/dayworktime/input")
-async def dayworktime_input(request : DataRequest_worktime_input):
-    
-    # DB에 저장
-    # dayworktime 객체를 생성하고 필드에 값 할당
-    dayworktime = DayWorkTime()
-    dayworktime.user_id = request.user_id
-    dayworktime.dayworktime_date = request.dayworktime_date
-    
-    #휴일인경우 0,0,0 값 입력
-    if request.dayworktime_holiday:
-        await timemanage.insert_holiday(user_id=request.user_id, holiday_date=request.dayworktime_date)
-
-        result = await timemanage.update_weekly_worktime(dayworktime.user_id, dayworktime.dayworktime_date)
-        
-        # 처리 결과 반환
-        return {"message": str(dayworktime.dayworktime_date)+" 휴일 저장."
-                "주간 근무시간 : "+str(result["hours"])+"시간"+str(result["minutes"])+"분"}
-    
-    #휴일이 아닌 경우
-    else:
-        dayworktime.dayworktime_start = datetime.combine(request.dayworktime_date, request.dayworktime_start)
-        dayworktime.dayworktime_end = datetime.combine(request.dayworktime_date, request.dayworktime_end)
-        dayworktime.dayworktime_rest = request.dayworktime_rest
-        # Calculate the total work time
-        total_work_time = dayworktime.dayworktime_end - dayworktime.dayworktime_start - request.dayworktime_rest*60
-        dayworktime.dayworktime_total = total_work_time
-        dayworktime.dayworktime_holiday = request.dayworktime_holiday
-        await dayworktime.save()
-
-        result = await timemanage.update_weekly_worktime(dayworktime.user_id, dayworktime.dayworktime_date)
-        
-        # 처리 결과 반환
-        return {"message": str(dayworktime.dayworktime_date)+" 입력 완료."
-                                                             "주간 근무시간 : "+str(result["hours"])+"시간"+str(result["minutes"])+"분"}
-
-
+# DB 세팅
 async def init_db():
     await Tortoise.init(
             db_url='postgres://postgres:claytimetracker@localhost:5432/timetracker',
@@ -107,145 +63,106 @@ async def init_db():
     await Tortoise.generate_schemas()
 
 
-#어드민 인증 함수
-async def is_admin(credentials: HTTPBasicCredentials = Depends(security)):
-    username = credentials.username
-    password = credentials.password
-
-    # DB에서 username, password 확인
-    user = await User.filter(username=username, password=password).first()
-
-    if username == 'admin' and user:
-        return True
-    else:
-        raise HTTPException(status_code=401, detail="Unauthorized")
-
-
-
-#Admin 화면 조회 (1) WorkTimeStandard을 조회해서 넘김 (2) 사용자 중 입력되지 않은 유저들을 리스트로 해서 넘김
-@app.get("/admin", response_class=HTMLResponse)
-async def admin(request: Request):
-    unfiled_users = await timemanage.get_unfiled_users()
-    context = {"request": request, "unfiled_users": unfiled_users}
-    return templates.TemplateResponse("admin/admin_uninputlist.html", context)
-
-@app.get("/admin/uninputlist", response_class=HTMLResponse)
-async def admin(request: Request):
-    unfiled_users = await timemanage.get_unfiled_users()
-    context = {"request": request, "unfiled_users": unfiled_users}
-    return templates.TemplateResponse("admin/admin_uninputlist.html", context)
+# #어드민 인증 함수
+# async def is_admin(credentials: HTTPBasicCredentials = Depends(security)):
+#     username = credentials.username
+#     password = credentials.password
+#
+#     # DB에서 username, password 확인
+#     user = await User.filter(username=username, password=password).first()
+#
+#     if username == 'admin' and user:
+#         return True
+#     else:
+#         raise HTTPException(status_code=401, detail="Unauthorized")
 
 
-@app.get("/admin/setting", response_class=HTMLResponse)
-async def admin_setting(request: Request):
-    # admin_route(is_admin: bool = Depends(is_admin)):
-    
-    worktimestandard = await timemanage.get_worktimestandard()
-    
-    if worktimestandard:
-        context = {"request": request, "worktimestandard": {
-            "weekworktimestandard_hours": worktimestandard.weekworktimestandard.days * 24 + worktimestandard.weekworktimestandard.seconds // 3600,
-            "recordstart": worktimestandard.recordstart,
-            "normaldayworktime_hours": worktimestandard.normaldayworktime.days * 24 + worktimestandard.normaldayworktime.seconds // 3600,
-        }}
-    else:
-        context = {"request": request, "worktimestandard": {
-            "weekworktimestandard_hours": 40,
-            "recordstart": date.today(),
-            "normaldayworktime_hours": 8,
-        }}
-    
-    return templates.TemplateResponse("admin/admin_setting.html", context)
-
-
-#년월을 입력받고 해당 년월의 전체 직원, 휴일리스트를 반환하는 함수
-@app.get("/admin/yearmonthlist/")
-async def yearmonthlist(request: Request, year: int, month: int):
-    print("년월리스트")
-    #DB에서 해당 년월의 전체 직원, 휴일리스트를 반환
-    total_user_list = await timemanage.get_total_user_list(year, month)
-    holiday_list = await timemanage.get_holiday_list(year, month)
-    context = {"request": request,"total_user_list": total_user_list, "holiday_list": holiday_list,
-               "year": year, "month": month}
-    print("년월리스트완료")
-    return templates.TemplateResponse("admin/admin_yearmonthlist.html", context)
-
-
-#년, 월이 없는 경우, 오늘을 기준으로 한 년 월을 기준으로 반환하는 함수
-@app.get("/admin/yearmonthlist/none")
-async def yearmonthlist_none(request: Request):
-    print("년월리스트")
-    #DB에서 해당 년월의 전체 직원, 휴일리스트를 반환
-    year = date.today().year
-    month = date.today().month
-    total_user_list = await timemanage.get_total_user_list(year, month)
-    holiday_list = await timemanage.get_holiday_list(year, month)
-    context = {"request": request, "total_user_list": total_user_list, "holiday_list": holiday_list,
-               "year": year, "month": month}
-    print("년월리스트완료")
-    return templates.TemplateResponse("admin/admin_yearmonthlist.html", context)
-    
-
-
-
-
-class DataRequest_worktimestandard(BaseModel):
-    weekworktimestandard_hours : int
-    recordstart: date
-    normaldayworktime_hours : int
-
-#worktimestandard_input 입력
-@app.post("/worktimestandard/input")
-async def worktimestandard_input(request: DataRequest_worktimestandard):
-    print("업데이트")
-    #DB에 저장
-    #int 값을 시간으로 변환
-    weekworktimestandard = timedelta(hours=request.weekworktimestandard_hours)
-    print(weekworktimestandard)
-    normaldayworktime = timedelta(hours=request.normaldayworktime_hours)
-    
-    worktimestandard = await timemanage.update_worktimestandard(weekworktimestandard, request.recordstart, normaldayworktime)
-    print("업데이트완료")
-    return worktimestandard
-
-
-class DataRequest_worktime_get(BaseModel):
-    user_id: int
-    dayworktime_date: date
-    
-
-#user_id, worktimedate를 입력받아, 해당 날짜에 데이터가 있는 경우 전달
-@app.post("/dayworktime/get")
-async def dayworktime_get(request: DataRequest_worktime_get):
-    
-    # 해당 날짜의 dayworktime을 조회
-    dayworktime = await timemanage.get_dayworktime(request.user_id, request.dayworktime_date)
-    ifholiday = await timemanage.check_holiday(request.dayworktime_date)
-    print(dayworktime)
-    if dayworktime:
-        return {"dayworktime_start": dayworktime.dayworktime_start.strftime("%H:%M"),
-            "dayworktime_end": dayworktime.dayworktime_end.strftime("%H:%M"),
-            "dayworktime_rest_hour": timemanage.get_hour(dayworktime.dayworktime_rest),
-            "dayworktime_rest_minute": timemanage.get_minute(dayworktime.dayworktime_rest),
-            "dayworktime_holiday": dayworktime.dayworktime_holiday,
-            "message": "데이터가 있습니다.",
-            "isrecorded": True}
-            
-    else:
-        if ifholiday:
-            return {"dayworktime_start": "00:00",
-                    "dayworktime_end": "00:00",
-                    "dayworktime_rest_hour": 0,
-                    "dayworktime_rest_minute": 0,
-                    "dayworktime_holiday": ifholiday,
-                    "message": "데이터가 없습니다.",
-                    "isrecorded": False}
-        
-        else:
-            return {"dayworktime_start": "09:00",
-                    "dayworktime_end": "18:00",
-                    "dayworktime_rest_hour": 1,
-                    "dayworktime_rest_minute": 0,
-                    "dayworktime_holiday": ifholiday,
-                    "message": "데이터가 없습니다.",
-                    "isrecorded": False}
+#
+# class DataRequest_worktime_get(BaseModel):
+#     user_id: int
+#     dayworktime_date: date
+#
+#
+# #user_id, worktimedate를 입력받아, 해당 날짜에 데이터가 있는 경우 전달
+# @app.post("/dayworktime/get")
+# async def dayworktime_get(request: DataRequest_worktime_get):
+#
+#     # 해당 날짜의 dayworktime을 조회
+#     dayworktime = await timemanage.get_dayworktime(request.user_id, request.dayworktime_date)
+#     ifholiday = await timemanage.check_holiday(request.dayworktime_date)
+#     print(dayworktime)
+#     if dayworktime:
+#         return {"dayworktime_start": dayworktime.dayworktime_start.strftime("%H:%M"),
+#             "dayworktime_end": dayworktime.dayworktime_end.strftime("%H:%M"),
+#             "dayworktime_rest_hour": timemanage.get_hour(dayworktime.dayworktime_rest),
+#             "dayworktime_rest_minute": timemanage.get_minute(dayworktime.dayworktime_rest),
+#             "dayworktime_holiday": dayworktime.dayworktime_holiday,
+#             "message": "데이터가 있습니다.",
+#             "isrecorded": True}
+#
+#     else:
+#         if ifholiday:
+#             return {"dayworktime_start": "00:00",
+#                     "dayworktime_end": "00:00",
+#                     "dayworktime_rest_hour": 0,
+#                     "dayworktime_rest_minute": 0,
+#                     "dayworktime_holiday": ifholiday,
+#                     "message": "데이터가 없습니다.",
+#                     "isrecorded": False}
+#
+#         else:
+#             return {"dayworktime_start": "09:00",
+#                     "dayworktime_end": "18:00",
+#                     "dayworktime_rest_hour": 1,
+#                     "dayworktime_rest_minute": 0,
+#                     "dayworktime_holiday": ifholiday,
+#                     "message": "데이터가 없습니다.",
+#                     "isrecorded": False}
+#
+#
+# class DataRequest_worktime_input(BaseModel):
+#     user_id: int
+#     dayworktime_date: date
+#     dayworktime_start: time
+#     dayworktime_end: time
+#     dayworktime_rest: timedelta
+#     dayworktime_holiday: bool
+#
+#
+# # 시간정보를 입력 받고, 주당 근무시한을 계산하여 입력하고, 이를 출력해서 보여줌
+# @app.post("/dayworktime/input")
+# async def dayworktime_input(request: DataRequest_worktime_input):
+#     # DB에 저장
+#     # dayworktime 객체를 생성하고 필드에 값 할당
+#     dayworktime = DayWorkTime()
+#     dayworktime.user_id = request.user_id
+#     dayworktime.dayworktime_date = request.dayworktime_date
+#
+#     # 휴일인경우 0,0,0 값 입력
+#     if request.dayworktime_holiday:
+#         await timemanage.insert_holiday(user_id=request.user_id, holiday_date=request.dayworktime_date)
+#
+#         result = await timemanage.update_weekly_worktime(dayworktime.user_id, dayworktime.dayworktime_date)
+#
+#         # 처리 결과 반환
+#         return {"message": str(dayworktime.dayworktime_date) + " 휴일 저장."
+#                                                                "주간 근무시간 : " + str(result["hours"]) + "시간" + str(
+#             result["minutes"]) + "분"}
+#
+#     # 휴일이 아닌 경우
+#     else:
+#         dayworktime.dayworktime_start = datetime.combine(request.dayworktime_date, request.dayworktime_start)
+#         dayworktime.dayworktime_end = datetime.combine(request.dayworktime_date, request.dayworktime_end)
+#         dayworktime.dayworktime_rest = request.dayworktime_rest
+#         # Calculate the total work time
+#         total_work_time = dayworktime.dayworktime_end - dayworktime.dayworktime_start - request.dayworktime_rest * 60
+#         dayworktime.dayworktime_total = total_work_time
+#         dayworktime.dayworktime_holiday = request.dayworktime_holiday
+#         await dayworktime.save()
+#
+#         result = await timemanage.update_weekly_worktime(dayworktime.user_id, dayworktime.dayworktime_date)
+#
+#         # 처리 결과 반환
+#         return {"message": str(dayworktime.dayworktime_date) + " 입력 완료."
+#                                                                "주간 근무시간 : " + str(result["hours"]) + "시간" + str(
+#             result["minutes"]) + "분"}

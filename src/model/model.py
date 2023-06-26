@@ -43,6 +43,14 @@ class Holidays(models.Model):
     modified_at = fields.DatetimeField(auto_now=True)
     
 
+#마지막 미입력 날짜 정보 저장
+class LastInputDate(models.Model):
+    id = fields.IntField(pk=True)
+    user = fields.ForeignKeyField("models.User", related_name="lastinputdate")
+    lastinputdate = fields.DateField()
+    created_at = fields.DatetimeField(auto_now_add=True)
+    modified_at = fields.DatetimeField(auto_now=True)
+
 #주당근무시간기준입력
 class WorkTimeStandard(models.Model):
     id = fields.IntField(pk=True)
