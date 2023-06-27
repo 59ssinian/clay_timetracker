@@ -1,5 +1,5 @@
 from datetime import timedelta, datetime
-
+import pytz
 
 #해당 주의 시작일인 월요일 날짜 반환
 def firstday_week(date):
@@ -13,10 +13,11 @@ def lastday_week(date):
 def firstday_month(date):
 	return date.replace(day=1)
 
-#해당 월의 마지막일인 날짜 반환
+#해당 월의 마지막 날짜 계산
 def lastday_month(date):
-	return date.replace(day=1) + timedelta(days=32-date.day)
-
+	return (date.replace(day=1) + timedelta(days=32)).replace(day=1) - timedelta(days=1)
+	
+	
 # 2개의 날짜가 같은 주(월요일부터 일요일 기준)에 속하는가?
 def is_same_week(date1, date2):
 	if firstday_week(date1) == firstday_week(date2):
@@ -58,7 +59,8 @@ def get_timedelta(hour, minute):
 
 # 현재 시간을 YYYY년 MM월 DD일 HH시 MM분으로 반환
 def now_str():
-	return datetime.now().strftime('%Y년 %m월 %d일 %H시 %M분')
+	tz = pytz.timezone('Asia/Seoul')
+	return datetime.now(tz=tz).strftime('%Y년 %m월 %d일 %H시 %M분')
 
 # hour을 timedelta로 변환
 def hour_to_timedelta(hour):

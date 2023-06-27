@@ -93,7 +93,7 @@ async def get_input_information(user_id, input_date):
 	# 1) 원칙 : 매달 마지막날
 	inform_last_day = tu.lastday_month(input_date)
 	# 2) 원칙 : 오늘 날짜가 마지막 날짜보다 크면, 오늘 날짜로 수정
-	if inform_last_day < datetime.now().date(): inform_last_day = datetime.now().date()
+	if inform_last_day > datetime.now().date(): inform_last_day = datetime.now().date()
 	
 	
 	
@@ -198,7 +198,7 @@ async def get_input_information(user_id, input_date):
 async def get_input_day(user_id):
 	
 	# 1) LastInputDate 에서 마지막 InputDate를 가져옴
-	lastinputdate = await LastInputDate.filter(user_id=user_id).order_by('-id').first()
+	lastinputdate = await LastInputDate.filter(user_id=user_id).order_by('-lastinputdate').first()
 	
 	# 2) Lastinputedate가 없으면, 회원 가입일자를 가져옴 - 초기 세팅
 	if not lastinputdate:

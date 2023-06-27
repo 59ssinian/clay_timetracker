@@ -23,7 +23,7 @@ class UserModel(BaseModel):
     access_token: str = None
 
 
-# 회원 가입 처리
+### 회원 가입 처리
 @router.post("/register")
 async def register(user_data: UserModel):
     # 입력 받은 데이터로 User 객체 생성
@@ -37,6 +37,9 @@ async def register(user_data: UserModel):
     if await User.all().count() == 0:
         user.is_admin = True
     
+    # 동일한 이메일이 있는지 검토
+    if await User.filter(email=user_data.email).first():
+        raise HTTPException(status_code=400, detail="같은 이메일로 가입된 계정이 있습니다.")
 
     # User 객체를 저장
     await user.save()
@@ -63,7 +66,7 @@ async def login(user_data: UserLoginModel):
                 "is_admin": user.is_admin, "is_user": user.is_user}
     else:
         # 로그인 실패시 예외 발생
-        raise HTTPException(status_code=400, detail="Invalid credentials")
+        raise HTTPException(status_code=400, detail="사용자 정보가 일치하지 않습니다.")
 
 
 
@@ -84,6 +87,10 @@ async def register_with_google(user_data: UserModel):
     # User 객체를 조회하여 첫번째 User인 경우, admin=true로 설정하여 저장
     if await User.all().count() == 0:
         user.is_admin = True
+
+    # 동일한 이메일이 있는지 검토
+    if await User.filter(email=user_data.email).first():
+        raise HTTPException(status_code=400, detail="같은 이메일로 가입된 계정이 있습니다.")
 
     # User 객체를 저장 후, # Google 계정에 Foreignkey 적용을 위한 값 반환
     # await user.save()
@@ -115,5 +122,5 @@ async def login_with_google(user_data: UserGoogleLoginModel):
                 "is_admin": user.is_admin, "is_user": user.is_user}
     else:
         # 로그인 실패시 예외 발생
-        raise HTTPException(status_code=400, detail="Invalid Google credentials")
+        raise HTTPException(status_code=400, detail="사용자 정보가 일치하지 않습니다.")
 

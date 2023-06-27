@@ -6,7 +6,7 @@ from src.model.model import Holidays
 from datetime import datetime, date, timedelta, time
 
 from src.api.admin import get_worktimestandard, update_worktimestandard
-
+import src.api.timeutil as tu
 
 	### Init Holiday ###
 
@@ -74,11 +74,11 @@ async def init_worktimestandard():
 	# 조회된 값이 없는 경우, 기본값으로 입력
 	if worktimestandard_exist == None:
 		print("init worktimestandard")
-		weekworktimestandard = 40
+		weekworktimestandard = tu.hour_to_timedelta(40)
 		#date 타입으로 2023-07-01을 recordstart에 입력
 		recordstart = date(2023, 7, 1)
 		
-		normaldayworktime   = 8
+		normaldayworktime   = tu.hour_to_timedelta(8)
 		
 		await update_worktimestandard(weekworktimestandard, recordstart, normaldayworktime)
 		

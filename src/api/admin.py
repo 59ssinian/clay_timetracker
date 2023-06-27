@@ -8,7 +8,13 @@ from datetime import datetime, date, timedelta, time
 from tortoise.queryset import Q
 import src.api.timeutil as tu
 
+
+
+
+
 router = APIRouter()
+
+
 
 '''
 ***** admin 프로세스 *****
@@ -28,9 +34,11 @@ async def get_admin_status(start_date, end_date):
 	# 1) start_date에서 end_date 까지의 휴일 정보를 반환하고, 심플리스트 생성
 	holidays_DB = await Holidays.filter(holiday_date__gte=start_date, holiday_date__lte=end_date)\
 		.order_by('holiday_date')
+	print(start_date, end_date)
 	
 	holiday_list = []
 	for holiday in holidays_DB:
+		print(holiday.holiday_date)
 		if holiday.isholiday:
 			holiday_list.append('H')
 		else:
@@ -44,7 +52,9 @@ async def get_admin_status(start_date, end_date):
 	# a. user_list에서 user를 얻어옴
 	
 	for user in users:
+		user_id = user.id
 		username = user.username
+		create_date = user.created_at.date()
 		status_list = []
 		overwork_list = []
 		missing_days = 0
@@ -53,29 +63,34 @@ async def get_admin_status(start_date, end_date):
 		# b. start_date부터 end_date까지 루프 시작
 		for i in range((end_date - start_date).days+1):
 			date = start_date + timedelta(days=i)
-		# c. Dayworktime에 userid, dayworktime_date가 존재하는지 확인
-			dayworktime = await DayWorkTime.filter(Q(user_id=user.id) & Q(dayworktime_date=date)).first()
-			if dayworktime:
-				if dayworktime.dayworktime_isdayoff:
-					status_list.append("D")
-				else:
-					status_list.append("I")
+			if date < create_date:
+				status_list.append("N")
 			else:
-				if holiday_list[i] == 'H':
-					status_list.append("H")
+		# c. Dayworktime에 userid, dayworktime_date가 존재하는지 확인
+				dayworktime = await DayWorkTime.filter(Q(user_id=user.id) & Q(dayworktime_date=date)).first()
+				if dayworktime:
+					if dayworktime.dayworktime_isdayoff:
+						status_list.append("D")
+					else:
+						status_list.append("I")
 				else:
-					status_list.append("M")
-					missing_days += 1
+					if holiday_list[i] == 'H':
+						status_list.append("H")
+					else:
+						status_list.append("M")
+						missing_days += 1
 		
 		if missing_days > 0:
 			total_missing_person += 1
 			unfiled_user_list.append({'username':username, 'id':user.id, 'missing_days':missing_days})
 		
 		# d. 전체 정리해서 리스트 생성
-		total_status_list.append({"username": username,
-		                          "status_list": status_list,
-		                          "overwork_list": overwork_list,
-		                          "missing_days": missing_days})
+		total_status_list.append({
+				"user_id":user_id,
+				"username": username,
+              "status_list": status_list,
+              "overwork_list": overwork_list,
+              "missing_days": missing_days})
 	
 	result = {'now': tu.now_str(),
 			  'total_user': total_user,
@@ -152,13 +167,13 @@ async def admin_lastmonth():
 	return status_list
 
 class InputYearMonth(BaseModel):
-	year : str
-	month : str
+	year : int
+	month : int
 # 이번 달 입력 상황 조회
 @router.post("/status/yearmonth")
-async def admin_yearmonth(yearmonth: InputYearMonth):
-	year = yearmonth.year
-	month = yearmonth.month
+async def admin_yearmonth(inputModel : InputYearMonth):
+	year = inputModel.year
+	month = inputModel.month
 	#year과 month의 해당 첫날과 마지막 날을 구함
 	firstday = tu.firstday_month(date(year, month, 1))
 	lastday = tu.lastday_month(date(year, month, 1))
@@ -168,15 +183,217 @@ async def admin_yearmonth(yearmonth: InputYearMonth):
 	
 	return status_list
 
+### 유저별 월별 조회
+
+
+# start_date에서 end_date 까지 전체 인원의 입력 상황 조회
+async def get_admin_status_user(user_id, start_date, end_date):
+	
+	# 1) start_date에서 end_date 까지의 휴일 정보를 반환하고, 심플리스트 생성
+	holidays_DB = await Holidays.filter(holiday_date__gte=start_date, holiday_date__lte=end_date) \
+		.order_by('holiday_date')
+	print(start_date, end_date)
+	
+	holiday_list = []
+	for holiday in holidays_DB:
+		print(holiday.holiday_date)
+		if holiday.isholiday:
+			holiday_list.append('H')
+		else:
+			holiday_list.append('W')
+	
+	# 2) User 테이블에서 isUser=True인 대상의 리스르를 id 순으로 user 조회
+	user = await User.filter(is_user=True, id=user_id).order_by("id").first()
+	
+	# 3) user_list 에서 user를 얻어, start_date부터 end_date까지 입력 상황을 조회
+	# a. user_list에서 user를 얻어옴
+	
+	
+	username = user.username
+	create_date = user.created_at.date()
+	status_list = []
+	overwork_list = []
+	detail_list = []
+	missing_list = []
+	inform_days_list = []
+	
+	# b. start_date부터 end_date까지 루프 시작
+	for i in range((end_date - start_date).days + 1):
+		date = start_date + timedelta(days=i)
+		start_time = ''  # 출근시간
+		end_time = ''  # 퇴근시간
+		rest_hour = 0   # 휴게시간 시
+		rest_minute = 0 # 휴게시간 분
+		total_time = 0
+		isdayoff = False
+		weekworktime = 0
+		isoverwork = False
+		
+		if date < create_date:
+			status_list.append("N")
+		else:
+			# c. Dayworktime에 userid, dayworktime_date가 존재하는지 확인
+			dayworktime = await DayWorkTime.filter(Q(user_id=user.id) & Q(dayworktime_date=date)).first()
+
+			if dayworktime:
+				isdayoff = dayworktime.dayworktime_isdayoff
+				if isdayoff:
+					status_list.append({'date':tu.date_to_str(date), 'state':"D"})
+					inform_days_list.append(tu.date_to_str(date))
+				else:
+					status_list.append({'date': tu.date_to_str(date), 'state': "I"})
+					inform_days_list.append(tu.date_to_str(date))
+					start_time = tu.time_to_str(dayworktime.dayworktime_start)
+					end_time = tu.time_to_str(dayworktime.dayworktime_end)
+					rest_hour = tu.get_hour(dayworktime.dayworktime_rest)
+					rest_minute = tu.get_minute(dayworktime.dayworktime_rest)
+					total_time = tu.timedelta_to_float(dayworktime.dayworktime_total)
+					weekworktime = tu.timedelta_to_float(dayworktime.dayworktime_weekworktime)
+					isoverwork = dayworktime.dayworktime_isweekworktimeover
+					if isoverwork:
+						overwork_list.append(tu.date_to_str(date))
+			else:
+				if holiday_list[i] == 'H':
+					status_list.append({'date': tu.date_to_str(date), 'state': "H"})
+					inform_days_list.append(tu.date_to_str(date))
+				else:
+					status_list.append({'date': tu.date_to_str(date), 'state': "M"})
+					inform_days_list.append(tu.date_to_str(date))
+					missing_list.append(tu.date_to_str(date))
+		
+		# d. detail_list에 추가
+		detail_list.append({
+			"date": tu.date_to_str(date),
+			"start_time": start_time,
+			"end_time": end_time,
+			"rest_hour": rest_hour,
+			"rest_minute": rest_minute,
+			"total_time": total_time,
+			"isdayoff": isdayoff,
+			"weekworktime": weekworktime,
+			"isoverwork": isoverwork,
+		})
+	
+	# d. 전체 정리해서 리스트 생성
+	user_status_list={
+		'now': tu.now_str(),
+		"username": username,
+		"status_list": status_list,
+		"overwork_list": overwork_list,
+		"detail_list": detail_list,
+		"missing_list": missing_list,
+		'start_date': tu.date_to_str(start_date),
+		'end_date': tu.date_to_str(end_date),
+		'holiday_list': holiday_list,
+		'inform_days_list':inform_days_list
+	}
+
+	
+	print(user_status_list)
+	
+	return user_status_list
+
+# 이번 달 입력 상황 조회
+
+class InputYearMonthUser(BaseModel):
+	year: int
+	month: int
+	user_id: int
+
+@router.post("/status/user/yearmonth")
+async def admin_yearmonth(inputModel: InputYearMonthUser):
+	year = inputModel.year
+	month = inputModel.month
+	user_id = inputModel.user_id
+	# year과 month의 해당 첫날과 마지막 날을 구함
+	firstday = tu.firstday_month(date(year, month, 1))
+	lastday = tu.lastday_month(date(year, month, 1))
+	today = date.today()
+	
+	#마지막일이 오늘보다 크면 오늘로 수정
+	if lastday > today:
+		lastday = today
+	
+	# 이번 달 1일과 오늘 사이의 입력 상황을 조회
+	status_list = await get_admin_status_user(user_id, firstday, lastday)
+	
+	return status_list
+
+
+
+### 권한 설정 페이지 ###
+
+
+## 전체 유저 리스트 조회 ##
+@router.get("/userlist")
+async def get_user_list():
+	user_list = []
+	users = await User.all().order_by('id')
+	for user in users:
+		id = user.id
+		username = user.username
+		is_admin = user.is_admin
+		is_user = user.is_user
+		user_list.append({
+			"id": id,
+			"username": username,
+			"is_admin": is_admin,
+			"is_user": is_user,
+		})
+		
+	print(user_list)
+	return user_list
+
+
+@router.get("/userlist/autocomplete")
+async def get_user_list_autocomplete():
+	username_list = []
+	users = await User.all().order_by('id')
+	for user in users:
+		username = user.username
+		username_list.append(username)
+	
+	print(username_list)
+	return username_list
+
+
+## 유저 권한 수정 ##
+class DataRequest_userrole(BaseModel):
+	user_id: int
+	is_admin: bool
+	is_user: bool
+	
+@router.post("/setting/role")
+async def admin_user_role(request: DataRequest_userrole):
+	user_id = request.user_id
+	is_admin = request.is_admin
+	is_user = request.is_user
+	user = await User.get(id=user_id)
+	user.is_admin = is_admin
+	user.is_user = is_user
+	await user.save()
+	return
+
+
+
+
+
 
 
 ### 관리자 설정 페이지 ###
 
 
+
+
+
+
+
+
+
 @router.get("/setting/get")
 async def admin_get_setting():
 	
-	worktimestandard = await get_worktimestandard()
+	worktimestandard = await WorkTimeStandard.get_or_none(id=1)
 	
 	if worktimestandard:
 		context = {
@@ -201,8 +418,8 @@ async def worktimestandard_input(request: DataRequest_worktimestandard):
 	print("setting 업데이트")
 	# DB에 저장
 	# int 값을 시간으로 변환
-	weekworktimestandard = tu.hours_to_timedelta(request.weekworktimestandard_hours)
-	normaldayworktime = tu.hours_to_timedelta(request.normaldayworktime_hours)
+	weekworktimestandard = tu.hour_to_timedelta(request.weekworktimestandard_hours)
+	normaldayworktime = tu.hour_to_timedelta(request.normaldayworktime_hours)
 	worktimestandard = await update_worktimestandard(weekworktimestandard, request.recordstart,
 	                                                            normaldayworktime)
 	print("setting 업데이트완료")

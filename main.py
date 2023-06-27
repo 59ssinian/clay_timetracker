@@ -5,6 +5,7 @@ from fastapi.templating import Jinja2Templates
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
 
+
 from src.model.model import User, DayWorkTime, Holidays, WorkTimeStandard
 from tortoise import Tortoise
 
@@ -46,6 +47,7 @@ async def startup():
     await init_db()
     await init_holiday()
     await init_worktimestandard()
+    
 
 @app.on_event("shutdown")
 async def shutdown():
