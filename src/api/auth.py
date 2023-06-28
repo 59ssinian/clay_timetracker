@@ -1,6 +1,7 @@
 from fastapi import APIRouter, HTTPException
 from tortoise.contrib.pydantic import pydantic_model_creator
 from pydantic import BaseModel
+from datetime import datetime
 
 from ..model.model import User
 
@@ -40,12 +41,16 @@ async def register(user_data: UserModel):
     # 동일한 이메일이 있는지 검토
     if await User.filter(email=user_data.email).first():
         raise HTTPException(status_code=400, detail="같은 이메일로 가입된 계정이 있습니다.")
-
+    
+    # start_date 는 가입일로 지정
+    user.start_date = datetime.now()
+    
     # User 객체를 저장
     await user.save()
 
     # 회원 가입 성공 메시지 반환
-    return {"message": "Registration successful"}
+    return {"user_id": user.id, "username": user.username,
+            "is_admin": user.is_admin, "is_user": user.is_user}
 
 class UserLoginModel(BaseModel):
     email: str
@@ -92,12 +97,16 @@ async def register_with_google(user_data: UserModel):
     if await User.filter(email=user_data.email).first():
         raise HTTPException(status_code=400, detail="같은 이메일로 가입된 계정이 있습니다.")
 
+    #start_date 는 가입일로    지정
+    user.start_date = datetime.now()
+
     # User 객체를 저장 후, # Google 계정에 Foreignkey 적용을 위한 값 반환
-    # await user.save()
     await user.save()
     
     # 회원 가입 성공 메시지 반환
-    return {"message": "Registration successful"}
+    return {"user_id": user.id, "username": user.username,
+            "is_admin": user.is_admin, "is_user": user.is_user}
+
 
 class UserGoogleLoginModel(BaseModel):
     email: str

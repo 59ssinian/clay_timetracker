@@ -13,6 +13,7 @@ class User(models.Model):
     provider = fields.CharField(max_length=255, null=True)
     provider_id = fields.CharField(max_length=255, null=True)
     access_token = fields.CharField(max_length=255, null=True)
+    start_date = fields.DateField(null=True)
     created_at = fields.DatetimeField(auto_now_add=True)
     updated_at = fields.DatetimeField(auto_now=True)
     
@@ -60,19 +61,6 @@ class WorkTimeStandard(models.Model):
     created_at = fields.DatetimeField(auto_now_add=True)
     modified_at = fields.DatetimeField(auto_now=True)
 
-
-
-
-# #년도, 월, 기준시작일, 기준 종료일, 주당작업시간, 지정근무시간, 초과여부(True/False)
-# class WeekWorkTime(models.Model):
-#     id = fields.IntField(pk=True)
-#     user = fields.ForeignKeyField("models.User", related_name="weekworktime")
-#     weekworktime_start = fields.DateField()
-#     weekworktime_end = fields.DateField()
-#     weekworktime_total = fields.TimeDeltaField()
-#     weekworktime_over = fields.BooleanField()
-#     created_at = fields.DatetimeField(auto_now_add=True)
-#     modified_at = fields.DatetimeField(auto_now=True)
 
 
 

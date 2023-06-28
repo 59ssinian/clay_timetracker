@@ -25,11 +25,19 @@ router = APIRouter()
 
 # start_date에서 end_date 까지 전체 인원의 입력 상황 조회
 async def get_admin_status(start_date, end_date):
+	
+	# 기준일 조회
+	worktimestandard = await WorkTimeStandard.first().values('recordstart')
+	record_start_day = worktimestandard['recordstart']
+	
 	# 조회 시간
 	total_status_list = []
 	total_missing_person = 0
+	total_missing_person_list = []
+	total_overwork_person_list = []
 	total_user = 0
 	unfiled_user_list = []
+	
 	
 	# 1) start_date에서 end_date 까지의 휴일 정보를 반환하고, 심플리스트 생성
 	holidays_DB = await Holidays.filter(holiday_date__gte=start_date, holiday_date__lte=end_date)\
@@ -54,14 +62,16 @@ async def get_admin_status(start_date, end_date):
 	for user in users:
 		user_id = user.id
 		username = user.username
+		record_start_date = user.start_date
 		create_date = user.created_at.date()
 		status_list = []
 		overwork_list = []
 		missing_days = 0
-		
+		isoverwork = False
 		
 		# b. start_date부터 end_date까지 루프 시작
 		for i in range((end_date - start_date).days+1):
+			
 			date = start_date + timedelta(days=i)
 			if date < create_date:
 				status_list.append("N")
@@ -73,24 +83,35 @@ async def get_admin_status(start_date, end_date):
 						status_list.append("D")
 					else:
 						status_list.append("I")
+						if dayworktime.dayworktime_isweekworktimeover:
+							isoverwork = True
 				else:
-					if holiday_list[i] == 'H':
-						status_list.append("H")
+					if (record_start_day <= date and record_start_date <= date) :
+
+						if holiday_list[i] == 'H':
+							status_list.append("H")
+
+						else:
+							status_list.append("M")
+							missing_days += 1
 					else:
-						status_list.append("M")
-						missing_days += 1
+						status_list.append("N")
 		
 		if missing_days > 0:
 			total_missing_person += 1
 			unfiled_user_list.append({'username':username, 'id':user.id, 'missing_days':missing_days})
+
+		if isoverwork:
+			total_overwork_person_list.append({'username':username, 'id':user.id})
 		
 		# d. 전체 정리해서 리스트 생성
 		total_status_list.append({
 				"user_id":user_id,
 				"username": username,
-              "status_list": status_list,
-              "overwork_list": overwork_list,
-              "missing_days": missing_days})
+                "status_list": status_list,
+                "overwork_list": overwork_list,
+                "missing_days": missing_days,
+				"isoverwork": isoverwork})
 	
 	result = {'now': tu.now_str(),
 			  'total_user': total_user,
@@ -99,11 +120,24 @@ async def get_admin_status(start_date, end_date):
 	          'unfiled_user_list': unfiled_user_list,
 	          'total_missing_person': total_missing_person,
 			  'holiday_list': holiday_list,
-	          'total_status_list': total_status_list}
+	          'total_status_list': total_status_list,
+	          'total_overwork_person_list': total_overwork_person_list}
 	
 	print(result)
 	
 	return result
+
+
+# 오늘 입력 상황 조회
+@router.get("/status/today")
+async def admin_today():
+	# 어제 날짜를 구함
+	today = date.today()
+	
+	# 어제 입력 상황을 조회
+	status_list = await get_admin_status(today, today)
+	
+	return status_list
 
 #어제 입력 상황 조회
 @router.get("/status/yesterday")
@@ -135,9 +169,10 @@ async def admin_lastweek():
 	# 이번주 월요일과 오늘을 구함
 	today = date.today()
 	monday = tu.firstday_week(today)
+	yesterday = today - timedelta(days=1)
 	
 	# 지난 주 월요일과 일요일 사이의 입력 상황을 조회
-	status_list = await get_admin_status(monday, today)
+	status_list = await get_admin_status(monday, yesterday)
 	
 	return status_list
 
@@ -210,6 +245,7 @@ async def get_admin_status_user(user_id, start_date, end_date):
 	
 	
 	username = user.username
+	record_start_date = user.start_date
 	create_date = user.created_at.date()
 	status_list = []
 	overwork_list = []
@@ -229,7 +265,7 @@ async def get_admin_status_user(user_id, start_date, end_date):
 		weekworktime = 0
 		isoverwork = False
 		
-		if date < create_date:
+		if create_date > date or record_start_date > date :
 			status_list.append("N")
 		else:
 			# c. Dayworktime에 userid, dayworktime_date가 존재하는지 확인
@@ -334,11 +370,13 @@ async def get_user_list():
 		username = user.username
 		is_admin = user.is_admin
 		is_user = user.is_user
+		start_date = user.start_date
 		user_list.append({
 			"id": id,
 			"username": username,
 			"is_admin": is_admin,
 			"is_user": is_user,
+			"start_date": tu.date_to_str(user.start_date),
 		})
 		
 	print(user_list)
@@ -621,3 +659,19 @@ async def check_holiday(dayworktime_date):
 			return False
 	else:
 		return None
+	
+### 유저 아이디 및 날짜를 받고, 해당 일자를 기준으로 start_date를 수정하는 함수 ###
+@router.get("/setting/startdate/{user_id}/{year}/{month}/{day}")
+async def put_setting_start_date(user_id: int, year: str, month: str, day: str):
+# 유저 아이디 및 날짜를 받고, 해당 일자를 기준으로 start_date를 수정하는 함수
+	
+	# 해당 유저의 start_date를 조회
+	user_exist = await User.filter(id=user_id).first()
+	
+	if user_exist:
+		# 해당 유저의 start_date를 수정
+		user_exist.start_date = date(int(year), int(month), int(day))
+		await user_exist.save()
+	
+	return True
+	

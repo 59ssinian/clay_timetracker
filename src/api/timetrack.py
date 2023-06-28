@@ -83,11 +83,19 @@ async def get_input_information(user_id, input_date):
 	# 1) 원칙 : 매날 첫날
 	inform_first_day = tu.firstday_month(input_date)
 	# 2) 원칙 : 가입일이 첫날 이후라면, 가입일로 수정
-		# 가입일 조회
-	user_created_at_datetime = await User.filter(id=user_id).values('created_at')
-	user_created_at = user_created_at_datetime[0]['created_at'].date()
-		# 계산
-	if inform_first_day < user_created_at: inform_first_day = user_created_at
+		# 위의 기준은 admin에서 지정하는 기준일로 조정
+	
+		# 전체 기준일 조회
+	worktimestandard = await WorkTimeStandard.first().values('recordstart')
+	record_start_day = worktimestandard['recordstart']
+		
+		# 개인 기준일 조회
+	user_start_date_datetime = await User.filter(id=user_id).values('start_date')
+	user_start_date = user_start_date_datetime[0]['start_date']
+		
+		# 계산 imform_first_day, record_start_day, user_start_date 중 가장 늦은날을 반환
+	imform_first_day = max(inform_first_day, record_start_day, user_start_date)
+	
 	
 	### 마지막일 지정
 	# 1) 원칙 : 매달 마지막날
@@ -369,7 +377,7 @@ async def get_weekly_worktime(user_id, dayworktime_date):
 	weekworktime_over = False
 	
 	# 주간 근무시간이 기준시간보다 크면 true 반환
-	if weekworktime > standard*60*60: weekworktime_over= True
+	if weekworktime > standard: weekworktime_over= True
 
 # 4) weekworktime과 isweekworktimeover를 업데이트
 # first_week_day 부터 last_week_day까지 돌면서 입력된 모든 날짜의 dayworktime_weekworktime, dayworktime_isweekworktimeover를 업데이트

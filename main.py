@@ -31,7 +31,8 @@ origins = [
     "http://localhost",
     "http://localhost:8080",
     "http://localhost:9000",
-    "http://3.34.198.181:8000"
+    "http://3.34.198.181:8000",
+    "https://claytimetracker.vercel.app/"
 ]
 
 app.add_middleware(
